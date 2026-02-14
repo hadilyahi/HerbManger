@@ -1,11 +1,11 @@
-import Layout from "./dashboard/layout";
+import Layout from "./layout";
 import Image from "next/image";
 export default function DashboardPage() {
   return (
-    <Layout>
+   
       <div className="text-center mt-20">
-        <h1 className="text-3xl font-cairoBold ">عشّاب السلطان</h1>
-        <p className="text-xl mt-2">
+        <h1 className="text-3xl font-cairo ">عشّاب السلطان</h1>
+        <p className="text-xl mt-2 font-cairo">
           مرحبًا بك في نظام إدارة محل{" "}
           <span className="text-green-600 font-semibold">عشّاب السلطان</span>
         </p>
@@ -18,6 +18,6 @@ export default function DashboardPage() {
           />
         </div>
       </div>
-    </Layout>
+    
   );
 }
