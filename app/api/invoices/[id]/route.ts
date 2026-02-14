@@ -1,69 +1,46 @@
 import { NextResponse } from "next/server";
-import {
-  getInvoiceById,
-  updateInvoicePaidAmount,
-  deleteInvoice,
-} from "@/lib/services/invoice.service";
+import { getInvoiceById, updateInvoicePaidAmount, deleteInvoice } from "@/lib/services/invoice.service";
 
-interface Props {
-  params: { id: string };
-}
 interface Params {
-  params: { id: string };
+  params: { id: string }; // ← تأكد أنها ليست Promise
 }
 
-/* 🔍 DETAILS */
-export async function GET(_: Request, { params }: Params) {
-  try {
-    const data = await getInvoiceById(Number(params.id));
-    return NextResponse.json(data);
-  } catch {
-    return NextResponse.json(
-      { error: "Failed to fetch invoice details" },
-      { status: 500 }
-    );
+export async function GET(req: Request, { params }: Params) {
+  const invoiceId = parseInt(params.id);
+  if (isNaN(invoiceId)) {
+    return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
   }
+
+  const invoice = await getInvoiceById(invoiceId);
+  if (!invoice) {
+    return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+  }
+
+  return NextResponse.json(invoice);
 }
 
-/* ✏️ EDIT */
-export async function PATCH(req: Request, { params }: Params) {
-  try {
-    const body = await req.json();
-    if (body.paidAmount === undefined) {
-      return NextResponse.json({ error: "Missing paidAmount" }, { status: 400 });
-    }
-
-    await updateInvoicePaidAmount(Number(params.id), body.paidAmount);
-    return NextResponse.json({ success: true });
-  } catch {
-    return NextResponse.json(
-      { error: "Failed to update invoice" },
-      { status: 500 }
-    );
+export async function DELETE(req: Request, { params }: Params) {
+  const invoiceId = parseInt(params.id);
+  if (isNaN(invoiceId)) {
+    return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
   }
+
+  await deleteInvoice(invoiceId);
+  return NextResponse.json({ success: true });
 }
 
-/* 🗑️ DELETE */
-export async function DELETE(req: Request, { params }: Props) {
-  // params.id يأتي من اسم الملف [id]
-  const id = params.id;
-  const invoiceId = Number(id);
-
-  if (!invoiceId || isNaN(invoiceId)) {
-    return NextResponse.json(
-      { message: "رقم الفاتورة غير صحيح" },
-      { status: 400 }
-    );
+export async function PUT(req: Request, { params }: Params) {
+  const invoiceId = parseInt(params.id);
+  if (isNaN(invoiceId)) {
+    return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
   }
 
-  try {
-    await deleteInvoice(invoiceId);
-    return NextResponse.json({ message: "تم حذف الفاتورة بنجاح" });
-  } catch (err) {
-    console.error("Error deleting invoice:", err);
-    return NextResponse.json(
-      { message: "حدث خطأ أثناء حذف الفاتورة" },
-      { status: 500 }
-    );
+  const body = await req.json();
+  const paidAmount = Number(body.paidAmount);
+  if (isNaN(paidAmount)) {
+    return NextResponse.json({ error: "Invalid paid amount" }, { status: 400 });
   }
+
+  await updateInvoicePaidAmount(invoiceId, paidAmount);
+  return NextResponse.json({ success: true });
 }
