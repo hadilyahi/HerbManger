@@ -41,11 +41,11 @@ export default function CreateInvoiceModal({
   ]);
 
   useEffect(() => {
-    fetch("http://localhost:3000/api/suppliers")
+    fetch("/api/suppliers")
       .then((res) => res.json())
       .then(setSuppliers);
 
-    fetch("http://localhost:3000/api/products")
+    fetch("/api/products")
       .then((res) => res.json())
       .then(setProducts);
   }, []);
@@ -68,7 +68,7 @@ export default function CreateInvoiceModal({
     );
 
   const handleSubmit = async () => {
-    await fetch("http://localhost:3000/api/invoices", {
+    await fetch("/api/invoices", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

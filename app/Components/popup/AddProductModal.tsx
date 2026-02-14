@@ -18,7 +18,7 @@ export default function AddProductModal({ categories, onClose, onSuccess }: AddP
 
 
   const handleAdd = async () => {
-    await fetch("http://localhost:3000/api/products", {
+    await fetch("/api/products", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, categoryId }),

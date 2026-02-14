@@ -18,7 +18,7 @@ export default function SuppliersPage() {
   const [phone, setPhone] = useState("");
 
   const fetchSuppliers = async () => {
-    const res = await fetch("http://localhost:3000/api/suppliers");
+    const res = await fetch("/api/suppliers");
     const data = await res.json();
     setSuppliers(data);
   };
@@ -31,7 +31,7 @@ export default function SuppliersPage() {
   }, []);
 
   const handleSubmit = async () => {
-    await fetch("http://localhost:3000/api/suppliers", {
+    await fetch("/api/suppliers", {
       method: "POST",
       body: JSON.stringify({ name, phone }),
     });
@@ -43,7 +43,7 @@ export default function SuppliersPage() {
   };
 
   const handleDelete = async (id: number) => {
-    await fetch("http://localhost:3000/api/suppliers", {
+    await fetch("/api/suppliers", {
       method: "DELETE",
       body: JSON.stringify({ id }),
     });

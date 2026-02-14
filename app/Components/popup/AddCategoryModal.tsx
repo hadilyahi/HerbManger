@@ -11,7 +11,7 @@ export default function AddCategoryModal({ onClose, onSuccess }: Props) {
   const [name, setName] = useState("");
 
   const handleAdd = async () => {
-    await fetch("http://localhost:3000/api/categories", {
+    await fetch("/api/categories", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name }),
