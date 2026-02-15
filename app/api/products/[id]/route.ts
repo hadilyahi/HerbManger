@@ -1,72 +1,76 @@
+import { NextRequest } from "next/server";
 import { updateProduct, deleteProduct } from "@/lib/services/product.service";
 
-interface RouteContext {
-  params: { id: string };
-}
-
-export async function PATCH(req: Request, context: RouteContext) {
+// ✅ PATCH
+export async function PATCH(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
   try {
-    const { id } = context.params;
+    const { id } = await context.params;
+    const numericId = Number(id);
 
-    const data = await req.json();
-    console.log("PATCH request body:", data);
+    if (isNaN(numericId)) {
+      throw new Error("الـ ID غير صالح");
+    }
 
+    const data = await request.json();
     const { name, categoryId } = data;
 
     if (!name || !categoryId) {
       throw new Error("البيانات غير كاملة: name و categoryId مطلوبان");
     }
 
-    const numericId = Number(id);
     const numericCategoryId = Number(categoryId);
-
-if (isNaN(numericId) || numericCategoryId <= 0) {
-  throw new Error("الـ ID أو الفئة غير صالحة");
-}
-
+    if (isNaN(numericCategoryId) || numericCategoryId <= 0) {
+      throw new Error("الفئة غير صالحة");
+    }
 
     await updateProduct(numericId, name, numericCategoryId);
 
-    return new Response(JSON.stringify({ message: "تم التعديل بنجاح" }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ message: "تم التعديل بنجاح" }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    );
   } catch (error: unknown) {
-    if (error instanceof Error) {
-      console.error("PATCH error:", error.message);
-      return new Response(JSON.stringify({ message: error.message }), {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-    return new Response(JSON.stringify({ message: "فشل في التعديل" }), {
+    const message =
+      error instanceof Error ? error.message : "فشل في التعديل";
+
+    console.error("PATCH error:", message);
+
+    return new Response(JSON.stringify({ message }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
     });
   }
 }
 
-export async function DELETE(req: Request, context: RouteContext) {
+// ✅ DELETE
+export async function DELETE(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
   try {
-    const { id } = context.params;
+    const { id } = await context.params;
     const numericId = Number(id);
-    if (isNaN(numericId)) throw new Error("الـ ID غير صالح");
+
+    if (isNaN(numericId)) {
+      throw new Error("الـ ID غير صالح");
+    }
 
     await deleteProduct(numericId);
 
-    return new Response(JSON.stringify({ message: "تم الحذف بنجاح" }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ message: "تم الحذف بنجاح" }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    );
   } catch (error: unknown) {
-    if (error instanceof Error) {
-      console.error("DELETE error:", error.message);
-      return new Response(JSON.stringify({ message: error.message }), {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-    return new Response(JSON.stringify({ message: "فشل في الحذف" }), {
+    const message =
+      error instanceof Error ? error.message : "فشل في الحذف";
+
+    console.error("DELETE error:", message);
+
+    return new Response(JSON.stringify({ message }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
     });
