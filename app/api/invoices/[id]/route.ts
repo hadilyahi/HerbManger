@@ -1,12 +1,18 @@
-import { NextResponse } from "next/server";
-import { getInvoiceById, updateInvoicePaidAmount, deleteInvoice } from "@/lib/services/invoice.service";
+import { NextRequest, NextResponse } from "next/server";
+import {
+  getInvoiceById,
+  updateInvoicePaidAmount,
+  deleteInvoice,
+} from "@/lib/services/invoice.service";
 
-interface Params {
-  params: { id: string }; // ← تأكد أنها ليست Promise
-}
+// ✅ GET
+export async function GET(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  const { id } = await context.params;
+  const invoiceId = Number(id);
 
-export async function GET(req: Request, { params }: Params) {
-  const invoiceId = parseInt(params.id);
   if (isNaN(invoiceId)) {
     return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
   }
@@ -19,8 +25,14 @@ export async function GET(req: Request, { params }: Params) {
   return NextResponse.json(invoice);
 }
 
-export async function DELETE(req: Request, { params }: Params) {
-  const invoiceId = parseInt(params.id);
+// ✅ DELETE
+export async function DELETE(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  const { id } = await context.params;
+  const invoiceId = Number(id);
+
   if (isNaN(invoiceId)) {
     return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
   }
@@ -29,16 +41,26 @@ export async function DELETE(req: Request, { params }: Params) {
   return NextResponse.json({ success: true });
 }
 
-export async function PUT(req: Request, { params }: Params) {
-  const invoiceId = parseInt(params.id);
+// ✅ PUT
+export async function PUT(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  const { id } = await context.params;
+  const invoiceId = Number(id);
+
   if (isNaN(invoiceId)) {
     return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
   }
 
-  const body = await req.json();
+  const body = await request.json();
   const paidAmount = Number(body.paidAmount);
+
   if (isNaN(paidAmount)) {
-    return NextResponse.json({ error: "Invalid paid amount" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid paid amount" },
+      { status: 400 }
+    );
   }
 
   await updateInvoicePaidAmount(invoiceId, paidAmount);
