@@ -35,20 +35,26 @@ export default function CreateInvoiceModal({
   const [supplierId, setSupplierId] = useState("");
   const [invoiceDate, setInvoiceDate] = useState("");
   const [paidAmount, setPaidAmount] = useState(0);
+  const [openDropdown, setOpenDropdown] = useState<number | null>(null);
+  const [productSearch, setProductSearch] = useState<string[]>([]);
 
   const [items, setItems] = useState<InvoiceItem[]>([
     { productId: 0, quantity: 0, purchasePrice: 0, sellingPrice: 0 },
   ]);
 
   useEffect(() => {
-    fetch("/api/suppliers")
-      .then((res) => res.json())
-      .then(setSuppliers);
+  fetch("/api/suppliers")
+    .then((res) => res.json())
+    .then(setSuppliers);
 
-    fetch("/api/products")
-      .then((res) => res.json())
-      .then(setProducts);
-  }, []);
+  fetch("/api/products")
+    .then((res) => res.json())
+    .then((data) => {
+      setProducts(data);
+      setProductSearch(new Array(data.length).fill(""));
+    });
+}, []);
+
 
   const addItem = () => {
     setItems([
@@ -148,21 +154,66 @@ export default function CreateInvoiceModal({
                 key={index}
                 className="grid grid-cols-5 gap-6 mb-6 items-center"
               >
-                <select
-                  className="bg-[#dfe8df] p-3 rounded-2xl"
-                  onChange={(e) => {
-                    const newItems = [...items];
-                    newItems[index].productId = Number(e.target.value);
-                    setItems(newItems);
-                  }}
-                >
-                  <option value="">اختر المنتج ...</option>
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="اختر أو ابحث عن منتج..."
+                    value={productSearch[index] || ""}
+                    onFocus={() => setOpenDropdown(index)}
+                    onChange={(e) => {
+                      const newSearch = [...productSearch];
+                      newSearch[index] = e.target.value;
+                      setProductSearch(newSearch);
+                      setOpenDropdown(index);
+                    }}
+                    className="bg-[#dfe8df] p-3 rounded-2xl w-full outline-none cursor-pointer"
+                  />
+
+                    {openDropdown === index && (
+                      <div className="absolute z-50 w-full bg-white rounded-xl shadow-lg max-h-48 overflow-y-auto mt-1">
+                        {products
+                          .filter((p) =>
+                            p.name
+                              .toLowerCase()
+                              .includes(
+                                (productSearch[index] || "").toLowerCase()
+                              )
+                          )
+        .map((p) => (
+          <div
+            key={p.id}
+            onClick={() => {
+              // حفظ المنتج
+              const newItems = [...items];
+              newItems[index].productId = p.id;
+              setItems(newItems);
+
+              // ملء الحقل وإغلاق القائمة
+              const newSearch = [...productSearch];
+              newSearch[index] = p.name;
+              setProductSearch(newSearch);
+              setOpenDropdown(null);
+            }}
+            className="px-4 py-2 cursor-pointer hover:bg-gray-100 text-right"
+          >
+            {p.name}
+          </div>
+        ))}
+
+      {products.filter((p) =>
+        p.name
+          .toLowerCase()
+          .includes(
+            (productSearch[index] || "").toLowerCase()
+          )
+      ).length === 0 && (
+        <div className="px-4 py-2 text-gray-400 text-sm text-center">
+          لا توجد نتائج
+        </div>
+      )}
+    </div>
+  )}
+</div>
 
                 <input
                   type="number"

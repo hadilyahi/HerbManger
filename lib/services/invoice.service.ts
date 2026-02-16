@@ -1,31 +1,29 @@
 import { pool } from "@/lib/db";
-import { InvoiceData, CreatedInvoiceResult,InsertResult } from "@/types/invoice";
-import mysql from "mysql2/promise";
+import { InvoiceData, CreatedInvoiceResult } from "@/types/invoice";
+import mysql, { RowDataPacket, ResultSetHeader } from "mysql2/promise";
 
-
+// إنشاء فاتورة جديدة
 export async function createInvoice(data: InvoiceData): Promise<CreatedInvoiceResult> {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
 
-    const [result] = await connection.query<mysql.ResultSetHeader>(
-    "INSERT INTO invoices (supplier_id, invoice_date, paid_amount) VALUES (?, ?, ?)",
-    [data.supplierId, data.invoiceDate, data.paidAmount]
+    const [result] = await connection.query<ResultSetHeader>(
+      "INSERT INTO invoices (supplier_id, invoice_date, paid_amount) VALUES (?, ?, ?)",
+      [data.supplierId, data.invoiceDate, data.paidAmount]
     );
 
     const invoiceId = result.insertId;
-
-
     let totalAmount = 0;
 
     for (const item of data.items) {
       const totalCost = item.quantity * item.purchasePrice;
       totalAmount += totalCost;
 
-      await connection.query(
+      await connection.query<ResultSetHeader>(
         `INSERT INTO invoice_items
-        (invoice_id, product_id, quantity, purchase_price, selling_price, total_cost)
-        VALUES (?, ?, ?, ?, ?, ?)`,
+         (invoice_id, product_id, quantity, purchase_price, selling_price, total_cost)
+         VALUES (?, ?, ?, ?, ?, ?)`,
         [invoiceId, item.productId, item.quantity, item.purchasePrice, item.sellingPrice, totalCost]
       );
     }
@@ -46,22 +44,21 @@ export async function createInvoice(data: InvoiceData): Promise<CreatedInvoiceRe
     connection.release();
   }
 }
-import { RowDataPacket } from "mysql2/promise";
-// إضافة في أسفل invoice.service.ts
 
-
-
-interface InvoiceRow {
-  id: number;
-  invoice_date: string;
-  total_amount: number;
-  paid_amount: number;
-  remaining: number;
-  supplier_name: string;
+// تحديث فاتورة بالكامل
+export interface InvoiceItemUpdate {
+  id?: number;           // موجود إذا كان العنصر موجود مسبقًا، undefined إذا جديد
+  productId?: number;    // مطلوب فقط للعناصر الجديدة
+  quantity: number;
+  purchasePrice: number;
+  sellingPrice: number;
 }
 
-// في /lib/services/invoice.service.ts
-
+export interface InvoiceFullUpdate {
+  supplierId: number;
+  paidAmount: number;
+  items: InvoiceItemUpdate[];
+}
 
 export interface Invoice {
   id: number;
@@ -73,6 +70,7 @@ export interface Invoice {
   items_count: number;
 }
 
+// جلب جميع الفواتير
 export async function getAllInvoices(): Promise<Invoice[]> {
   const [rows] = await pool.query<RowDataPacket[]>(`
     SELECT 
@@ -90,7 +88,6 @@ export async function getAllInvoices(): Promise<Invoice[]> {
     ORDER BY i.invoice_date DESC
   `);
 
-  // تحويل RowDataPacket[] إلى Invoice[] صريح
   return (rows as RowDataPacket[]).map(row => ({
     id: Number(row.id),
     invoice_date: String(row.invoice_date),
@@ -102,31 +99,17 @@ export async function getAllInvoices(): Promise<Invoice[]> {
   }));
 }
 
-export async function updateInvoicePaidAmount(
-  invoiceId: number,
-  paidAmount: number
-) {
-  await pool.query(
-    `
-    UPDATE invoices
-    SET paid_amount = ?, remaining = total_amount - ?
-    WHERE id = ?
-    `,
-    [paidAmount, paidAmount, invoiceId]
-  );
-}
+// حذف فاتورة
 export async function deleteInvoice(invoiceId: number) {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
 
-    // حذف عناصر الفاتورة أولاً
     await connection.query(
       "DELETE FROM invoice_items WHERE invoice_id = ?",
       [invoiceId]
     );
 
-    // حذف الفاتورة نفسها
     await connection.query(
       "DELETE FROM invoices WHERE id = ?",
       [invoiceId]
@@ -141,7 +124,7 @@ export async function deleteInvoice(invoiceId: number) {
   }
 }
 
-// جلب فاتورة واحدة حسب الـ ID
+// جلب فاتورة واحدة
 export async function getInvoiceById(invoiceId: number) {
   const [rows] = await pool.query<RowDataPacket[]>(
     `
@@ -162,9 +145,7 @@ export async function getInvoiceById(invoiceId: number) {
     [invoiceId]
   );
 
-  if (!rows || rows.length === 0) {
-    throw new Error("الفاتورة غير موجودة");
-  }
+  if (!rows || rows.length === 0) throw new Error("الفاتورة غير موجودة");
 
   const row = rows[0];
   return {
@@ -176,4 +157,79 @@ export async function getInvoiceById(invoiceId: number) {
     supplier_name: String(row.supplier_name),
     items_count: Number(row.items_count),
   };
+}
+
+// تعديل فاتورة بالكامل
+export async function updateInvoiceFull(invoiceId: number, data: InvoiceFullUpdate) {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    // تحديث بيانات الفاتورة الأساسية
+    await connection.query(
+      `UPDATE invoices 
+       SET supplier_id = ?, paid_amount = ? 
+       WHERE id = ?`,
+      [data.supplierId, data.paidAmount, invoiceId]
+    );
+
+    // جلب العناصر الحالية
+    const [existingRows] = await connection.query<RowDataPacket[]>(
+      `SELECT id FROM invoice_items WHERE invoice_id = ?`,
+      [invoiceId]
+    );
+    const existingIds = existingRows.map(r => r.id as number);
+
+    const incomingIds: number[] = [];
+    let totalAmount = 0;
+
+    for (const item of data.items) {
+      const itemTotal = item.quantity * item.purchasePrice;
+      totalAmount += itemTotal;
+
+      if (item.id && existingIds.includes(item.id)) {
+        // تحديث عنصر موجود
+        await connection.query(
+          `UPDATE invoice_items 
+           SET quantity = ?, purchase_price = ?, selling_price = ?, total_cost = ?
+           WHERE id = ?`,
+          [item.quantity, item.purchasePrice, item.sellingPrice, itemTotal, item.id]
+        );
+        incomingIds.push(item.id);
+      } else if (!item.id && item.productId) {
+        // إضافة عنصر جديد
+        const [result] = await connection.query<ResultSetHeader>(
+          `INSERT INTO invoice_items
+           (invoice_id, product_id, quantity, purchase_price, selling_price, total_cost)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [invoiceId, item.productId, item.quantity, item.purchasePrice, item.sellingPrice, itemTotal]
+        );
+        incomingIds.push(result.insertId);
+      }
+    }
+
+    // حذف العناصر التي لم تعد موجودة
+    const idsToDelete = existingIds.filter(id => !incomingIds.includes(id));
+    if (idsToDelete.length > 0) {
+      await connection.query(
+        `DELETE FROM invoice_items WHERE id IN (?)`,
+        [idsToDelete]
+      );
+    }
+
+    // تحديث الإجمالي والمبلغ المتبقي
+    const remaining = totalAmount - data.paidAmount;
+    await connection.query(
+      `UPDATE invoices SET total_amount = ?, remaining = ? WHERE id = ?`,
+      [totalAmount, remaining, invoiceId]
+    );
+
+    await connection.commit();
+    return true;
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
+  }
 }

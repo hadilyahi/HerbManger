@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import AddProductModal from "../../Components/popup/AddProductModal";
 import DeleteProductModal from "../../Components/popup/DeleteProductModal";
 import AddCategoryModal from "../../Components/popup/AddCategoryModal";
+import EditProductModal from "../../Components/popup/EditProductModal";
+
 
 interface Product {
   id: number;
@@ -28,6 +30,7 @@ export default function ProductsPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -110,8 +113,12 @@ export default function ProductsPage() {
 
         {/* جدول المنتجات */}
         <div className="overflow-x-auto">
-          <table className="w-full table-auto border-collapse shadow rounded-lg overflow-hidden">
-            <thead className="bg-green-500 text-white text-left">
+          <table
+            dir="rtl"
+            className="w-full table-auto border-collapse shadow rounded-lg overflow-hidden text-right"
+          >
+            <thead className="bg-green-500 text-white text-right">
+
               <tr>
                 <th className="p-3">المنتج</th>
                 <th className="p-3">الفئة</th>
@@ -132,6 +139,16 @@ export default function ProductsPage() {
                     <button
                       onClick={() => {
                         setSelectedProduct(product);
+                        setShowEdit(true);
+                      }}
+                      className="text-blue-600 hover:text-blue-800"
+                    >
+                      ✏️
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setSelectedProduct(product);
                         setShowDelete(true);
                       }}
                       className="text-red-600 hover:text-red-800"
@@ -139,6 +156,7 @@ export default function ProductsPage() {
                       🗑️
                     </button>
                   </td>
+
                 </tr>
               ))}
               {filteredProducts.length === 0 && (
@@ -170,12 +188,24 @@ export default function ProductsPage() {
       )}
 
       {showDelete && selectedProduct && (
-        <DeleteProductModal
-          product={selectedProduct}
-          onClose={() => setShowDelete(false)}
-          onSuccess={fetchData}
-        />
-      )}
+  <DeleteProductModal
+    product={selectedProduct}
+    onClose={() => setShowDelete(false)}
+    onSuccess={fetchData}
+  />
+)}
+
+      {showEdit && selectedProduct && (
+  <EditProductModal
+    product={selectedProduct}
+    categories={categories}
+    onClose={() => setShowEdit(false)}
+    onSuccess={fetchData}
+  />
+)}
+
     </div>
+    
   );
+  
 }

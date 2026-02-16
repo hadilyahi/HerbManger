@@ -5,7 +5,7 @@ import { Trash2, Pencil, MoreVertical, Plus } from "lucide-react";
 import CreateInvoiceModal from "../../Components/popup/CreateInvoiceModal";
 import InvoiceDetailsModal from "../../Components/popup/InvoiceDetailsModal";
 import DeleteInvoiceModal from "../../Components/popup/DeleteInvoiceModal";
-// import EditInvoiceModal from "../../Components/popup/EditInvoiceModal";
+import EditInvoiceModal from "../../Components/popup/EditInvoiceModal";
 
 interface Invoice {
   id: number;
@@ -23,33 +23,37 @@ export default function InvoicesPage() {
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<number | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
-  
   const [showDelete, setShowDelete] = useState(false);
 
   // فلترة حسب التاريخ
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
 
+  // ✅ تعريف fetchInvoices مرة واحدة لاستخدامها في كل مكان
   const fetchInvoices = async () => {
-    const res = await fetch("/api/invoices");
-    const data = await res.json();
-    setInvoices(data);
-  };
-
- useEffect(() => {
-    const loadInvoices = async () => {
+    try {
       const res = await fetch("/api/invoices");
       const data = await res.json();
       setInvoices(data);
-    };
-    loadInvoices();
-  }, []);
+    } catch (err) {
+      console.error("Failed to fetch invoices:", err);
+    }
+  };
+
+  useEffect(() => {
+  const loadInvoices = async () => {
+    await fetchInvoices(); // تحميل الفواتير
+  };
+
+  loadInvoices();
+}, []);
+
   // تطبيق فلترة التاريخ
   const filteredInvoices = invoices.filter((inv) => {
-    if (!startDate && !endDate) return true; // لا فلترة إذا لم يحدد التاريخ
-    const invoiceDate = new Date(inv.invoice_date).setHours(0,0,0,0);
-    const start = startDate ? new Date(startDate).setHours(0,0,0,0) : null;
-    const end = endDate ? new Date(endDate).setHours(0,0,0,0) : null;
+    if (!startDate && !endDate) return true;
+    const invoiceDate = new Date(inv.invoice_date).setHours(0, 0, 0, 0);
+    const start = startDate ? new Date(startDate).setHours(0, 0, 0, 0) : null;
+    const end = endDate ? new Date(endDate).setHours(0, 0, 0, 0) : null;
 
     if (start && end) return invoiceDate >= start && invoiceDate <= end;
     if (start) return invoiceDate >= start;
@@ -59,10 +63,7 @@ export default function InvoicesPage() {
 
   return (
     <div className="bg-white min-h-screen px-16 pt-12">
-      {/* TITLE */}
-      <h1 className="text-4xl font-bold text-center mb-14">
-        إدارة الفواتير
-      </h1>
+      <h1 className="text-4xl font-bold text-center mb-14">إدارة الفواتير</h1>
 
       {/* TOP ACTIONS */}
       <div className="flex flex-wrap gap-4 mb-8 items-center">
@@ -74,7 +75,6 @@ export default function InvoicesPage() {
           إضافة فاتورة جديدة
         </button>
 
-        {/* فلترة حسب التاريخ */}
         <div className="flex gap-2 items-center bg-gray-200 px-4 py-2 rounded-xl">
           <span>من:</span>
           <input
@@ -134,15 +134,14 @@ export default function InvoicesPage() {
                         setShowDelete(true);
                       }}
                     />
-                   <Pencil
-  size={18}
-  className="text-blue-600 cursor-pointer"
-  onClick={() => {
-    setSelectedInvoiceId(invoice.id);
-    setShowEdit(true);
-  }}
-/>
-
+                    <Pencil
+                      size={18}
+                      className="text-blue-600 cursor-pointer"
+                      onClick={() => {
+                        setSelectedInvoiceId(invoice.id);
+                        setShowEdit(true);
+                      }}
+                    />
                     <MoreVertical
                       size={18}
                       className="cursor-pointer"
@@ -186,19 +185,17 @@ export default function InvoicesPage() {
         <DeleteInvoiceModal
           invoiceId={selectedInvoiceId}
           onClose={() => setShowDelete(false)}
-          onSuccess={(deletedId) => {
-            setInvoices(prev => prev.filter(inv => inv.id !== deletedId));
-          }}
+          onSuccess={fetchInvoices}
         />
-        
       )}
-      {/* {showEdit && selectedInvoiceId && (
-<EditInvoiceModal
-  invoiceId={selectedInvoiceId}
-  onClose={() => setShowEdit(false)}
-  onSuccess={fetchInvoices}
-/>
-)} */}
+
+      {showEdit && selectedInvoiceId && (
+        <EditInvoiceModal
+          invoiceId={selectedInvoiceId}
+          onClose={() => setShowEdit(false)}
+          onSuccess={fetchInvoices}
+        />
+      )}
     </div>
   );
 }

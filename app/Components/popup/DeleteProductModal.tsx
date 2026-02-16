@@ -1,71 +1,66 @@
-// Components/popup/DeleteProductModal.tsx
 "use client";
 
+interface Product {
+  id: number;
+  name: string;
+}
 
-
-interface DeleteProductModalProps {
+interface Props {
   product: Product;
   onClose: () => void;
   onSuccess: () => void;
 }
-// types.ts
-export interface Product {
-  id: number;
-  name: string;
-  categoryId: number | null;
-}
-
-export interface Category {
-  id: number;
-  name: string;
-}
-
 
 export default function DeleteProductModal({
   product,
   onClose,
   onSuccess,
-}: DeleteProductModalProps) {
+}: Props) {
   const handleDelete = async () => {
-    if (!product?.id || isNaN(Number(product.id))) {
-      alert("الـ ID غير صالح");
-      return;
-    }
-
     try {
-      const response = await fetch(`/api/products/${Number(product.id)}`, {
+      const res = await fetch(`/api/products/${product.id}`, {
         method: "DELETE",
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data?.message || "فشل في الحذف");
+      if (!res.ok) {
+        throw new Error("فشل حذف المنتج");
       }
 
       onSuccess();
       onClose();
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        console.error("Delete error:", error.message);
-        alert("خطأ: " + error.message);
-      }
+    } catch (error) {
+      console.error(error);
+      alert("حدث خطأ أثناء حذف المنتج");
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex justify-center items-center">
-      <div className="bg-white text-black p-6 rounded w-96">
-        <h2 className="text-lg font-bold mb-4">حذف المنتج</h2>
-        <p className="mb-4">
-          هل أنت متأكد أنك تريد حذف المنتج <strong>{product.name}</strong>؟
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-lg w-96 p-6 text-center">
+        <h2 className="text-xl font-bold mb-4 text-red-600">
+          تأكيد الحذف
+        </h2>
+
+        <p className="mb-6 text-gray-700">
+          هل أنت متأكد من حذف المنتج:
+          <br />
+          <span className="font-semibold text-gray-900">
+            {product.name}
+          </span>
+          ؟
         </p>
-        <div className="flex justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 border rounded">
-            الغاء
+
+        <div className="flex justify-center gap-4">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 border rounded hover:bg-gray-100"
+          >
+            إلغاء
           </button>
+
           <button
             onClick={handleDelete}
-            className="bg-red-500 px-4 py-2 rounded text-white"
+            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
           >
             حذف
           </button>

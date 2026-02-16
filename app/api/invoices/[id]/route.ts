@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  getInvoiceById,
-  updateInvoicePaidAmount,
-  deleteInvoice,
-} from "@/lib/services/invoice.service";
+import { getInvoiceById, deleteInvoice, updateInvoiceFull, InvoiceItemUpdate } from "@/lib/services/invoice.service";
 
 // ✅ GET
 export async function GET(
@@ -41,28 +37,56 @@ export async function DELETE(
   return NextResponse.json({ success: true });
 }
 
-// ✅ PUT
+// ✅ PUT - تحديث الفاتورة بالكامل
 export async function PUT(
-  request: NextRequest,
+  req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await context.params;
-  const invoiceId = Number(id);
+  try {
+    const { id } = await context.params;
+    const invoiceId = Number(id);
+    if (isNaN(invoiceId)) {
+      return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+    }
 
-  if (isNaN(invoiceId)) {
-    return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+    const body = await req.json();
+    const { supplierId, paidAmount, items } = body;
+
+    if (!supplierId || !Array.isArray(items) || isNaN(Number(paidAmount))) {
+      return NextResponse.json({ error: "Invalid data" }, { status: 400 });
+    }
+
+    // تحويل العناصر إلى النوع الصحيح
+    const parsedItems: InvoiceItemUpdate[] = items.map((i: {
+      id?: number;
+      productId?: number;
+      quantity: number;
+      purchasePrice: number;
+      sellingPrice: number;
+    }) => {
+      if (!i.id && !i.productId) {
+        throw new Error("Each item must have either an existing id or a productId");
+      }
+
+      return {
+        id: i.id ? Number(i.id) : 0, // 0 أو أي قيمة مؤقتة للعنصر الجديد
+        productId: i.productId ? Number(i.productId) : undefined,
+        quantity: Number(i.quantity),
+        purchasePrice: Number(i.purchasePrice),
+        sellingPrice: Number(i.sellingPrice),
+      };
+    });
+
+    await updateInvoiceFull(invoiceId, {
+      supplierId: Number(supplierId),
+      paidAmount: Number(paidAmount),
+      items: parsedItems,
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to update invoice";
+    console.error("PUT /invoices/:id error:", message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  const body = await request.json();
-  const paidAmount = Number(body.paidAmount);
-
-  if (isNaN(paidAmount)) {
-    return NextResponse.json(
-      { error: "Invalid paid amount" },
-      { status: 400 }
-    );
-  }
-
-  await updateInvoicePaidAmount(invoiceId, paidAmount);
-  return NextResponse.json({ success: true });
 }
