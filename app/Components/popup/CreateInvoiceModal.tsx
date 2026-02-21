@@ -38,11 +38,12 @@ export default function CreateInvoiceModal({
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]); // 👈 جديد
-  const [searchTerms, setSearchTerms] = useState<{ [key: number]: string }>({});
+  
   const [supplierId, setSupplierId] = useState("");
   const [invoiceDate, setInvoiceDate] = useState("");
   const [paidAmount, setPaidAmount] = useState(0);
-
+const [searchTerms, setSearchTerms] = useState<{ [key: number]: string }>({});
+const [activeDropdown, setActiveDropdown] = useState<number | null>(null);
   const [showAddProduct, setShowAddProduct] = useState(false); // 👈 جديد
   const [currentIndex, setCurrentIndex] = useState<number | null>(null); // 👈 جديد
 
@@ -165,27 +166,40 @@ export default function CreateInvoiceModal({
                 >
                   {/* 🔥 PRODUCT + ADD BUTTON */}
                   <div className="flex gap-2">
-                    <div className="relative w-full">
+                   <div className="relative w-full">
   <input
     type="text"
     placeholder="ابحث عن المنتج..."
     value={searchTerms[index] || ""}
+    onFocus={() => setActiveDropdown(index)} // فتح عند التركيز
     onChange={(e) => {
       setSearchTerms({
         ...searchTerms,
         [index]: e.target.value,
       });
+      setActiveDropdown(index); // فتح عند الكتابة
     }}
     className="bg-[#dfe8df] p-3 rounded-2xl w-full"
   />
 
-  {searchTerms[index] && (
+  {activeDropdown === index && (
     <div className="absolute top-full left-0 w-full bg-white shadow-lg rounded-xl max-h-40 overflow-y-auto z-50">
+      
+      {products.filter((p) =>
+        p.name
+          .toLowerCase()
+          .includes((searchTerms[index] || "").toLowerCase())
+      ).length === 0 && (
+        <div className="p-2 text-gray-400 text-center">
+          لا يوجد منتج
+        </div>
+      )}
+
       {products
         .filter((p) =>
           p.name
             .toLowerCase()
-            .includes(searchTerms[index].toLowerCase())
+            .includes((searchTerms[index] || "").toLowerCase())
         )
         .map((p) => (
           <div
@@ -199,6 +213,8 @@ export default function CreateInvoiceModal({
                 ...searchTerms,
                 [index]: p.name,
               });
+
+              setActiveDropdown(null); // 🔥 اغلاق الدروب داون
             }}
             className="p-2 hover:bg-gray-100 cursor-pointer"
           >
