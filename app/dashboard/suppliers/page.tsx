@@ -7,6 +7,9 @@ interface Supplier {
   name: string;
   phone?: string;
   created_at: string;
+  totalDebt?: number;   // مجموع الفواتير
+  totalPaid?: number;   // مجموع المدفوع
+  remaining?: number;   // المتبقي
 }
 
 export default function SuppliersPage() {
@@ -22,6 +25,11 @@ export default function SuppliersPage() {
   const [editSupplier, setEditSupplier] = useState<Supplier | null>(null);
   const [editName, setEditName] = useState("");
   const [editPhone, setEditPhone] = useState("");
+
+  // دين/دفعة
+  const [debtAmount, setDebtAmount] = useState("");
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [currentSupplier, setCurrentSupplier] = useState<Supplier | null>(null);
 
   // تأكيد الحذف
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -41,31 +49,28 @@ export default function SuppliersPage() {
 }, []);
 
 
-  // إضافة
+  // إضافة مورد
   const handleSubmit = async () => {
     await fetch("/api/suppliers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, phone }),
     });
-
     setName("");
     setPhone("");
     setShowForm(false);
     fetchSuppliers();
   };
 
-  // فتح نافذة التعديل
+  // تعديل مورد
   const openEditModal = (supplier: Supplier) => {
     setEditSupplier(supplier);
     setEditName(supplier.name);
     setEditPhone(supplier.phone || "");
   };
 
-  // حفظ التعديل
   const handleUpdate = async () => {
     if (!editSupplier) return;
-
     await fetch("/api/suppliers", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -75,20 +80,49 @@ export default function SuppliersPage() {
         phone: editPhone,
       }),
     });
-
     setEditSupplier(null);
     fetchSuppliers();
   };
 
-  // حذف
+  // حذف مورد
   const handleDelete = async () => {
     if (!deleteId) return;
-
     await fetch(`/api/suppliers?id=${deleteId}`, {
       method: "DELETE",
     });
-
     setDeleteId(null);
+    fetchSuppliers();
+  };
+
+  // إضافة دين
+  const handleAddDebt = async () => {
+    if (!currentSupplier || !debtAmount) return;
+    await fetch("/api/suppliers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        supplierId: currentSupplier.id,
+        debtAmount: Number(debtAmount),
+      }),
+    });
+    setDebtAmount("");
+    setCurrentSupplier(null);
+    fetchSuppliers();
+  };
+
+  // تسجيل دفعة
+  const handleAddPayment = async () => {
+    if (!currentSupplier || !paymentAmount) return;
+    await fetch("/api/suppliers", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        supplierId: currentSupplier.id,
+        paymentAmount: Number(paymentAmount),
+      }),
+    });
+    setPaymentAmount("");
+    setCurrentSupplier(null);
     fetchSuppliers();
   };
 
@@ -154,6 +188,9 @@ export default function SuppliersPage() {
               <th className="p-3">اسم المورد</th>
               <th className="p-3">رقم الهاتف</th>
               <th className="p-3">تاريخ الإضافة</th>
+              <th className="p-3">إجمالي الدين</th>
+              <th className="p-3">المدفوع</th>
+              <th className="p-3">المتبقي</th>
               <th className="p-3">التحكم</th>
             </tr>
           </thead>
@@ -162,12 +199,15 @@ export default function SuppliersPage() {
               <tr key={supplier.id} className="border-t">
                 <td className="p-3">{supplier.name}</td>
                 <td className="p-3">{supplier.phone || "-"}</td>
-                <td className="p-3">
-                  {new Date(supplier.created_at).toLocaleDateString()}
-                </td>
-                <td className="p-3 flex gap-4">
+                <td className="p-3">{new Date(supplier.created_at).toLocaleDateString()}</td>
+                <td className="p-3">{supplier.totalDebt ?? 0}</td>
+                <td className="p-3">{supplier.totalPaid ?? 0}</td>
+                <td className="p-3">{supplier.remaining ?? 0}</td>
+                <td className="p-3 flex gap-2">
                   <button
-                    onClick={() => openEditModal(supplier)}
+                    onClick={() => {
+                      openEditModal(supplier);
+                    }}
                     className="text-blue-600"
                   >
                     تعديل
@@ -178,6 +218,12 @@ export default function SuppliersPage() {
                   >
                     حذف
                   </button>
+                  <button
+                    onClick={() => setCurrentSupplier(supplier)}
+                    className="text-green-600"
+                  >
+                    دين/دفعة
+                  </button>
                 </td>
               </tr>
             ))}
@@ -185,26 +231,68 @@ export default function SuppliersPage() {
         </table>
       </div>
 
+      {/* Debt/Payment Modal */}
+      {currentSupplier && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
+          <div className="bg-white p-6 rounded-lg w-96">
+            <h2 className="text-xl font-bold mb-4">{currentSupplier.name} - دين/دفعة</h2>
+            <input
+              value={debtAmount}
+              onChange={(e) => setDebtAmount(e.target.value)}
+              placeholder="إضافة دين جديد"
+              type="number"
+              className="border p-2 rounded w-full mb-3"
+            />
+            <button
+              onClick={handleAddDebt}
+              className="bg-yellow-500 text-white px-4 py-2 rounded mb-4 w-full"
+            >
+              إضافة دين
+            </button>
+
+            <input
+              value={paymentAmount}
+              onChange={(e) => setPaymentAmount(e.target.value)}
+              placeholder="تسجيل دفعة جديدة"
+              type="number"
+              className="border p-2 rounded w-full mb-3"
+            />
+            <button
+              onClick={handleAddPayment}
+              className="bg-green-600 text-white px-4 py-2 rounded w-full"
+            >
+              تسجيل دفعة
+            </button>
+
+            <div className="flex justify-end mt-4">
+              <button
+                onClick={() => setCurrentSupplier(null)}
+                className="border px-4 py-2 rounded"
+              >
+                إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Edit Modal */}
       {editSupplier && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
           <div className="bg-white p-6 rounded-lg w-96">
             <h2 className="text-xl font-bold mb-4">تعديل المورد</h2>
-
             <input
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
               className="border p-2 rounded w-full mb-3"
               placeholder="اسم المورد"
             />
-
             <input
               value={editPhone}
               onChange={(e) => setEditPhone(e.target.value)}
               className="border p-2 rounded w-full mb-4"
               placeholder="رقم الهاتف"
             />
-
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setEditSupplier(null)}
@@ -227,9 +315,7 @@ export default function SuppliersPage() {
       {deleteId && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
           <div className="bg-white p-6 rounded-lg w-80 text-center">
-            <p className="mb-4">
-              هل أنت متأكد من حذف هذا المورد؟
-            </p>
+            <p className="mb-4">هل أنت متأكد من حذف هذا المورد؟</p>
             <div className="flex justify-center gap-4">
               <button
                 onClick={() => setDeleteId(null)}
