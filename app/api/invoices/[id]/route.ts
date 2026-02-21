@@ -81,6 +81,7 @@ export async function PUT(
       supplierId: Number(supplierId),
       paidAmount: Number(paidAmount),
       items: parsedItems,
+      invoiceDate: body.invoiceDate, // تأكد من إرسال هذا الحقل من العميل
     });
 
     return NextResponse.json({ success: true });

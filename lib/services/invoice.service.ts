@@ -57,6 +57,7 @@ export interface InvoiceItemUpdate {
 export interface InvoiceFullUpdate {
   supplierId: number;
   paidAmount: number;
+  invoiceDate: string;
   items: InvoiceItemUpdate[];
 }
 
@@ -126,52 +127,76 @@ export async function deleteInvoice(invoiceId: number) {
 
 // جلب فاتورة واحدة
 export async function getInvoiceById(invoiceId: number) {
-  const [rows] = await pool.query<RowDataPacket[]>(
+  const [invoiceRows] = await pool.query<RowDataPacket[]>(
     `
     SELECT 
       i.id,
+      i.supplier_id,
       i.invoice_date,
-      i.total_amount,
-      i.paid_amount,
-      i.remaining,
-      s.name AS supplier_name,
-      COUNT(ii.id) AS items_count
+      i.paid_amount
     FROM invoices i
-    JOIN suppliers s ON i.supplier_id = s.id
-    LEFT JOIN invoice_items ii ON ii.invoice_id = i.id
     WHERE i.id = ?
-    GROUP BY i.id, i.invoice_date, i.total_amount, i.paid_amount, i.remaining, s.name
     `,
     [invoiceId]
   );
 
-  if (!rows || rows.length === 0) throw new Error("الفاتورة غير موجودة");
+  if (invoiceRows.length === 0) {
+    throw new Error("الفاتورة غير موجودة");
+  }
 
-  const row = rows[0];
+  const invoice = invoiceRows[0];
+
+  const [itemsRows] = await pool.query<RowDataPacket[]>(
+    `
+    SELECT
+      ii.id,
+      ii.product_id,
+      ii.quantity,
+      ii.purchase_price,
+      ii.selling_price,
+      p.name AS product_name
+    FROM invoice_items ii
+    JOIN products p ON p.id = ii.product_id
+    WHERE ii.invoice_id = ?
+    `,
+    [invoiceId]
+  );
+
   return {
-    id: Number(row.id),
-    invoice_date: String(row.invoice_date),
-    total_amount: Number(row.total_amount),
-    paid_amount: Number(row.paid_amount),
-    remaining: Number(row.remaining),
-    supplier_name: String(row.supplier_name),
-    items_count: Number(row.items_count),
+    id: Number(invoice.id),
+    supplierId: Number(invoice.supplier_id),
+    invoiceDate: String(invoice.invoice_date),
+    paidAmount: Number(invoice.paid_amount),
+    items: itemsRows.map(row => ({
+      id: Number(row.id),
+      productId: Number(row.product_id),
+      quantity: Number(row.quantity),
+      purchasePrice: Number(row.purchase_price),
+      sellingPrice: Number(row.selling_price),
+      product: {
+        id: Number(row.product_id),
+        name: String(row.product_name),
+      },
+    })),
   };
 }
+
 
 // تعديل فاتورة بالكامل
 export async function updateInvoiceFull(invoiceId: number, data: InvoiceFullUpdate) {
   const connection = await pool.getConnection();
+  
   try {
     await connection.beginTransaction();
 
     // تحديث بيانات الفاتورة الأساسية
-    await connection.query(
-      `UPDATE invoices 
-       SET supplier_id = ?, paid_amount = ? 
-       WHERE id = ?`,
-      [data.supplierId, data.paidAmount, invoiceId]
-    );
+   await connection.query(
+  `UPDATE invoices 
+   SET supplier_id = ?, invoice_date = ?, paid_amount = ? 
+   WHERE id = ?`,
+  [data.supplierId, data.invoiceDate, data.paidAmount, invoiceId]
+);
+
 
     // جلب العناصر الحالية
     const [existingRows] = await connection.query<RowDataPacket[]>(

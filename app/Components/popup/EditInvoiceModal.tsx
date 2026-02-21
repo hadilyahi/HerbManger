@@ -2,232 +2,372 @@
 
 import { useEffect, useState } from "react";
 import { X, Plus, Trash2 } from "lucide-react";
-import { InvoiceItem } from "@/types/invoice";
+import AddProductModal from "./AddProductModal";
 
-interface EditInvoiceModalProps {
+interface Supplier {
+  id: number;
+  name: string;
+}
+
+interface Product {
+  id: number;
+  name: string;
+}
+
+interface Category {
+  id: number;
+  name: string;
+}
+
+interface InvoiceItem {
+  productId: number;
+  quantity: number;
+  purchasePrice: number;
+  sellingPrice: number;
+  product?: {
+    id: number;
+    name: string;
+  };
+}
+
+interface Props {
   invoiceId: number;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-// واجهة تمثل العنصر داخل الفاتورة عند التعديل
-interface EditItem {
-  id?: number; // موجود إذا كان العنصر موجود مسبقًا
-  productId?: number; // مطلوب فقط للعناصر الجديدة
-  productName?: string;
-  quantity: number;
-  purchasePrice: number;
-  sellingPrice: number;
-}
+export default function EditInvoiceModal({
+  invoiceId,
+  onClose,
+  onSuccess,
+}: Props) {
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
 
-// نوع البيانات القادمة من API
-interface InvoiceAPI {
-  supplierId: number;
-  paidAmount: number;
-  items: EditItem[];
-}
+  const [supplierId, setSupplierId] = useState("");
+  const [invoiceDate, setInvoiceDate] = useState("");
+  const [paidAmount, setPaidAmount] = useState(0);
 
-export default function EditInvoiceModal({ invoiceId, onClose, onSuccess }: EditInvoiceModalProps) {
-  const [supplierId, setSupplierId] = useState<number>(0);
-  const [paidAmount, setPaidAmount] = useState<number>(0);
-  const [items, setItems] = useState<EditItem[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [searchTerms, setSearchTerms] = useState<Record<number, string>>({});
+  const [activeDropdown, setActiveDropdown] = useState<number | null>(null);
+  const [showAddProduct, setShowAddProduct] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState<number | null>(null);
 
-  // جلب بيانات الفاتورة عند فتح البوباب
- useEffect(() => {
-  const fetchInvoice = async () => {
-    if (!invoiceId) return;
-    try {
-      const res = await fetch(`/api/invoices/${invoiceId}`);
-      const data = await res.json();
+  const [items, setItems] = useState<InvoiceItem[]>([
+    { productId: 0, quantity: 0, purchasePrice: 0, sellingPrice: 0 },
+  ]);
 
-      setSupplierId(data.supplierId ?? 0);
-      setPaidAmount(data.paidAmount ?? 0);
-      setItems((data.items || []).map((i: InvoiceItem) => ({
-  id: i.id,
-  productId: i.productId,
-  productName: i.productName || "",
-  quantity: i.quantity ?? 0,
-  purchasePrice: i.purchasePrice ?? 0,
-  sellingPrice: i.sellingPrice ?? 0,
-})));
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  /* ================= LOAD DATA ================= */
+  useEffect(() => {
+    fetch("/api/suppliers").then(res => res.json()).then(setSuppliers);
+    fetch("/api/products").then(res => res.json()).then(setProducts);
+    fetch("/api/categories").then(res => res.json()).then(setCategories);
 
-  fetchInvoice();
-}, [invoiceId]);
+    fetch(`/api/invoices/${invoiceId}`)
+      .then(res => res.json())
+      .then(data => {
+        setSupplierId(String(data.supplierId ?? ""));
+        setInvoiceDate(data.invoiceDate ?? "");
+        setPaidAmount(data.paidAmount ?? 0);
 
-  // تحديث عنصر
-  const updateItem = (index: number, field: keyof EditItem, value: string | number) => {
-    setItems((prev) => {
-      const copy = [...prev];
-      copy[index] = { ...copy[index], [field]: value };
-      return copy;
-    });
-  };
+        const safeItems: InvoiceItem[] = Array.isArray(data.items)
+          ? data.items
+          : [];
 
-  // إضافة عنصر جديد
-  const addItem = () => {
-    setItems((prev) => [...prev, { quantity: 1, purchasePrice: 0, sellingPrice: 0 }]);
-  };
+        setItems(
+          safeItems.map(item => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            purchasePrice: item.purchasePrice,
+            sellingPrice: item.sellingPrice,
+            product: item.product,
+          }))
+        );
 
-  // حذف عنصر
-  const removeItem = (index: number) => {
-    setItems((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  // حفظ التعديلات
-  const handleSave = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/invoices/${invoiceId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          supplierId,
-          paidAmount,
-          items,
-        }),
+        const terms: Record<number, string> = {};
+        safeItems.forEach((item, index) => {
+          if (item.product) {
+            terms[index] = item.product.name;
+          }
+        });
+        setSearchTerms(terms);
       });
+  }, [invoiceId]);
 
-      const result = await res.json();
-      if (res.ok) {
-        onSuccess();
-        onClose();
-      } else {
-        alert(result.error || "حدث خطأ أثناء حفظ التعديلات");
-      }
-    } catch (err) {
-      console.error(err);
-      alert("فشل الاتصال بالخادم");
-    } finally {
-      setLoading(false);
-    }
+  /* ================= HELPERS ================= */
+  const addItem = () => {
+    setItems([
+      ...items,
+      { productId: 0, quantity: 0, purchasePrice: 0, sellingPrice: 0 },
+    ]);
   };
 
+  const removeItem = (index: number) => {
+    setItems(items.filter((_, i) => i !== index));
+  };
+
+  const calculateTotal = () =>
+    items.reduce(
+      (acc, item) => acc + item.quantity * item.purchasePrice,
+      0
+    );
+
+  /* ================= SUBMIT ================= */
+  const handleSubmit = async () => {
+    await fetch(`/api/invoices/${invoiceId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        supplierId,
+        invoiceDate,
+        paidAmount,
+        items,
+      }),
+    });
+
+    onSuccess();
+    onClose();
+  };
+
+  /* ================= UI (نفس Create) ================= */
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white w-[800px] p-6 rounded-lg shadow-lg relative max-h-[90vh] overflow-y-auto">
-        <button
-          className="absolute top-4 right-4 text-gray-600 hover:text-black"
-          onClick={onClose}
-        >
-          <X size={20} />
-        </button>
+    <>
+      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="bg-[#f3f6f3] w-[1000px] max-h-[92vh] rounded-[30px] shadow-2xl flex flex-col overflow-hidden">
 
-        <h2 className="text-2xl font-bold mb-4">تعديل الفاتورة #{invoiceId}</h2>
-
-        {/* بيانات أساسية */}
-        <div className="mb-4 flex gap-4 items-center">
-          <div>
-            <label className="block font-semibold mb-1">المورد</label>
-            <input
-              type="number"
-              value={supplierId}
-              onChange={(e) => setSupplierId(Number(e.target.value))}
-              className="border rounded px-2 py-1 w-40"
-            />
+          {/* HEADER */}
+          <div className="p-8 text-center border-b bg-[#f3f6f3]">
+            <h2 className="text-3xl font-bold text-gray-800">
+              تعديل الفاتورة
+            </h2>
           </div>
 
-          <div>
-            <label className="block font-semibold mb-1">المبلغ المدفوع</label>
-            <input
-              type="number"
-              value={paidAmount}
-              onChange={(e) => setPaidAmount(Number(e.target.value))}
-              className="border rounded px-2 py-1 w-40"
-            />
-          </div>
-        </div>
+          {/* BODY */}
+          <div className="p-10 overflow-y-auto flex-1">
 
-        {/* جدول المنتجات */}
-        <div className="mb-4">
-          <h3 className="font-semibold mb-2">المنتجات</h3>
-          <table className="w-full border border-gray-300 text-center">
-            <thead className="bg-gray-200">
-              <tr>
-                <th className="p-2 border">اسم المنتج</th>
-                <th className="p-2 border">الكمية</th>
-                <th className="p-2 border">سعر الشراء</th>
-                <th className="p-2 border">سعر البيع</th>
-                <th className="p-2 border">الإجراءات</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item, index) => (
-                <tr key={index}>
-                  <td className="p-2 border">
-                    <input
-                      type="text"
-                      value={item.productName || ""}
-                      onChange={(e) => updateItem(index, "productName", e.target.value)}
-                      className="border rounded px-1 py-0.5 w-full"
-                    />
-                  </td>
-                  <td className="p-2 border">
-                    <input
-                      type="number"
-                      value={item.quantity}
-                      onChange={(e) => updateItem(index, "quantity", Number(e.target.value))}
-                      className="border rounded px-1 py-0.5 w-20"
-                    />
-                  </td>
-                  <td className="p-2 border">
-                    <input
-                      type="number"
-                      value={item.purchasePrice}
-                      onChange={(e) => updateItem(index, "purchasePrice", Number(e.target.value))}
-                      className="border rounded px-1 py-0.5 w-24"
-                    />
-                  </td>
-                  <td className="p-2 border">
-                    <input
-                      type="number"
-                      value={item.sellingPrice}
-                      onChange={(e) => updateItem(index, "sellingPrice", Number(e.target.value))}
-                      className="border rounded px-1 py-0.5 w-24"
-                    />
-                  </td>
-                  <td className="p-2 border">
+            {/* Supplier + Date */}
+            <div className="grid grid-cols-2 gap-10 mb-12">
+              <div>
+                <label className="block mb-3 font-semibold text-gray-700">
+                  اسم المورد
+                </label>
+                <select
+                  value={supplierId}
+                  onChange={e => setSupplierId(e.target.value)}
+                  className="w-full bg-[#dfe8df] p-4 rounded-2xl outline-none"
+                >
+                  <option value="">اسم المورد</option>
+                  {suppliers.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block mb-3 font-semibold text-gray-700">
+                  تاريخ الفاتورة
+                </label>
+                <input
+                  type="date"
+                  value={invoiceDate || ""}
+                  onChange={e => setInvoiceDate(e.target.value)}
+                  className="w-full bg-[#dfe8df] p-4 rounded-2xl outline-none"
+                />
+              </div>
+            </div>
+
+            {/* ITEMS HEADER */}
+            <div className="grid grid-cols-5 gap-6 mb-4 text-center font-semibold text-gray-700">
+              <div>المنتج</div>
+              <div>سعر الشراء</div>
+              <div>الكمية</div>
+              <div>سعر البيع</div>
+              <div>السعر الاجمالي</div>
+            </div>
+
+            {/* ITEMS */}
+            {items.map((item, index) => {
+              const rowTotal = item.quantity * item.purchasePrice;
+
+              return (
+                <div key={index} className="grid grid-cols-5 gap-6 mb-6 items-center">
+
+                  {/* PRODUCT */}
+                  <div className="flex gap-2">
+                    <div className="relative w-full">
+                      <input
+                        value={searchTerms[index] || ""}
+                        onFocus={() => setActiveDropdown(index)}
+                        onChange={e => {
+                          setSearchTerms({ ...searchTerms, [index]: e.target.value });
+                          setActiveDropdown(index);
+                        }}
+                        className="bg-[#dfe8df] p-3 rounded-2xl w-full"
+                        placeholder="ابحث عن المنتج..."
+                      />
+
+                      {activeDropdown === index && (
+                        <div className="absolute top-full left-0 w-full bg-white shadow-lg rounded-xl max-h-40 overflow-y-auto z-50">
+                          {products
+                            .filter(p =>
+                              p.name.toLowerCase().includes(
+                                (searchTerms[index] || "").toLowerCase()
+                              )
+                            )
+                            .map(p => (
+                              <div
+                                key={p.id}
+                                onClick={() => {
+                                  const newItems = [...items];
+                                  newItems[index].productId = p.id;
+                                  setItems(newItems);
+                                  setSearchTerms({ ...searchTerms, [index]: p.name });
+                                  setActiveDropdown(null);
+                                }}
+                                className="p-2 hover:bg-gray-100 cursor-pointer"
+                              >
+                                {p.name}
+                              </div>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+
                     <button
-                      className="text-red-600 hover:text-red-800"
-                      onClick={() => removeItem(index)}
+                      onClick={() => {
+                        setCurrentIndex(index);
+                        setShowAddProduct(true);
+                      }}
+                      className="bg-green-600 text-white px-3 rounded-xl"
                     >
-                      <Trash2 size={18} />
+                      <Plus size={16} />
                     </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
 
-          <button
-            className="flex items-center gap-2 mt-2 px-4 py-2 bg-green-300 rounded hover:bg-green-400"
-            onClick={addItem}
-          >
-            <Plus size={16} /> إضافة منتج
-          </button>
-        </div>
+                  <input
+                    type="number"
+                    value={item.purchasePrice}
+                    className="bg-[#dfe8df] p-3 rounded-2xl text-center"
+                    onChange={e => {
+                      const newItems = [...items];
+                      newItems[index].purchasePrice = +e.target.value;
+                      setItems(newItems);
+                    }}
+                  />
 
-        {/* أزرار الحفظ والإلغاء */}
-        <div className="flex justify-end gap-4">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400"
-          >
-            إلغاء
-          </button>
-          <button
-            onClick={handleSave}
-            className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
-            disabled={loading}
-          >
-            {loading ? "جارٍ الحفظ..." : "حفظ التعديلات"}
-          </button>
+                  <input
+                    type="number"
+                    value={item.quantity}
+                    className="bg-[#dfe8df] p-3 rounded-2xl text-center"
+                    onChange={e => {
+                      const newItems = [...items];
+                      newItems[index].quantity = +e.target.value;
+                      setItems(newItems);
+                    }}
+                  />
+
+                  <input
+                    type="number"
+                    value={item.sellingPrice}
+                    className="bg-[#dfe8df] p-3 rounded-2xl text-center"
+                    onChange={e => {
+                      const newItems = [...items];
+                      newItems[index].sellingPrice = +e.target.value;
+                      setItems(newItems);
+                    }}
+                  />
+
+                  <div className="flex items-center justify-between bg-[#dfe8df] p-3 rounded-2xl">
+                    <span>{rowTotal.toFixed(2)} دج</span>
+                    {items.length > 1 && (
+                      <Trash2
+                        size={18}
+                        className="text-red-500 cursor-pointer"
+                        onClick={() => removeItem(index)}
+                      />
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* ADD ITEM */}
+            <div className="flex justify-end mb-12">
+              <button
+                onClick={addItem}
+                className="flex items-center gap-2 text-gray-500 font-semibold"
+              >
+                <Plus size={18} />
+                إضافة منتج آخر
+              </button>
+            </div>
+
+            {/* TOTALS */}
+            <div className="grid grid-cols-2 gap-10 mb-10">
+              <div>
+                <label className="block mb-3 font-semibold">
+                  المبلغ المدفوع
+                </label>
+                <input
+                  type="number"
+                  value={paidAmount}
+                  onChange={e => setPaidAmount(+e.target.value)}
+                  className="w-full bg-[#dfe8df] p-4 rounded-2xl text-center"
+                />
+              </div>
+
+              <div>
+                <label className="block mb-3 font-semibold">
+                  السعر الإجمالي للفاتورة كاملة
+                </label>
+                <div className="bg-[#dfe8df] p-4 rounded-2xl text-center">
+                  {calculateTotal().toFixed(2)} دج
+                </div>
+              </div>
+            </div>
+
+            <div className="text-center">
+              <label className="block mb-3 font-semibold">
+                المبلغ المتبقي
+              </label>
+              <div className="bg-[#dfe8df] p-4 rounded-2xl w-[300px] mx-auto text-center">
+                {(calculateTotal() - paidAmount).toFixed(2)} دج
+              </div>
+            </div>
+          </div>
+
+          {/* FOOTER */}
+          <div className="p-8 flex justify-center gap-16 bg-[#f3f6f3]">
+            <button
+              onClick={onClose}
+              className="bg-red-600 text-white px-14 py-3 rounded-2xl text-lg font-semibold shadow"
+            >
+              إلغاء
+            </button>
+
+            <button
+              onClick={handleSubmit}
+              className="bg-blue-700 text-white px-14 py-3 rounded-2xl text-lg font-semibold shadow"
+            >
+              حفظ التعديل
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* ADD PRODUCT MODAL */}
+      {showAddProduct && (
+        <AddProductModal
+          categories={categories}
+          onClose={() => setShowAddProduct(false)}
+          onSuccess={() =>
+            fetch("/api/products").then(res => res.json()).then(setProducts)
+          }
+        />
+      )}
+    </>
   );
 }
