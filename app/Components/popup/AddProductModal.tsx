@@ -29,7 +29,7 @@ export default function AddProductModal({ categories, onClose, onSuccess }: AddP
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex justify-center items-center">
+    <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[9999]">
       <div className="bg-white text-black p-6 rounded w-96">
         <h2 className="text-lg font-bold mb-4">اضافة منتج</h2>
 
