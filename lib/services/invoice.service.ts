@@ -3,14 +3,16 @@ import { InvoiceData, CreatedInvoiceResult } from "@/types/invoice";
 import mysql, { RowDataPacket, ResultSetHeader } from "mysql2/promise";
 
 // إنشاء فاتورة جديدة
-export async function createInvoice(data: InvoiceData): Promise<CreatedInvoiceResult> {
+export async function createInvoice(
+  data: InvoiceData,
+): Promise<CreatedInvoiceResult> {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
 
     const [result] = await connection.query<ResultSetHeader>(
       "INSERT INTO invoices (supplier_id, invoice_date, paid_amount) VALUES (?, ?, ?)",
-      [data.supplierId, data.invoiceDate, data.paidAmount]
+      [data.supplierId, data.invoiceDate, data.paidAmount],
     );
 
     const invoiceId = result.insertId;
@@ -24,7 +26,14 @@ export async function createInvoice(data: InvoiceData): Promise<CreatedInvoiceRe
         `INSERT INTO invoice_items
          (invoice_id, product_id, quantity, purchase_price, selling_price, total_cost)
          VALUES (?, ?, ?, ?, ?, ?)`,
-        [invoiceId, item.productId, item.quantity, item.purchasePrice, item.sellingPrice, totalCost]
+        [
+          invoiceId,
+          item.productId,
+          item.quantity,
+          item.purchasePrice,
+          item.sellingPrice,
+          totalCost,
+        ],
       );
     }
 
@@ -32,7 +41,7 @@ export async function createInvoice(data: InvoiceData): Promise<CreatedInvoiceRe
 
     await connection.query(
       "UPDATE invoices SET total_amount=?, remaining=? WHERE id=?",
-      [totalAmount, remaining, invoiceId]
+      [totalAmount, remaining, invoiceId],
     );
 
     await connection.commit();
@@ -47,8 +56,8 @@ export async function createInvoice(data: InvoiceData): Promise<CreatedInvoiceRe
 
 // تحديث فاتورة بالكامل
 export interface InvoiceItemUpdate {
-  id?: number;           // موجود إذا كان العنصر موجود مسبقًا، undefined إذا جديد
-  productId?: number;    // مطلوب فقط للعناصر الجديدة
+  id?: number; // موجود إذا كان العنصر موجود مسبقًا، undefined إذا جديد
+  productId?: number; // مطلوب فقط للعناصر الجديدة
   quantity: number;
   purchasePrice: number;
   sellingPrice: number;
@@ -89,7 +98,7 @@ export async function getAllInvoices(): Promise<Invoice[]> {
     ORDER BY i.invoice_date DESC
   `);
 
-  return (rows as RowDataPacket[]).map(row => ({
+  return (rows as RowDataPacket[]).map((row) => ({
     id: Number(row.id),
     invoice_date: String(row.invoice_date),
     total_amount: Number(row.total_amount),
@@ -106,15 +115,11 @@ export async function deleteInvoice(invoiceId: number) {
   try {
     await connection.beginTransaction();
 
-    await connection.query(
-      "DELETE FROM invoice_items WHERE invoice_id = ?",
-      [invoiceId]
-    );
+    await connection.query("DELETE FROM invoice_items WHERE invoice_id = ?", [
+      invoiceId,
+    ]);
 
-    await connection.query(
-      "DELETE FROM invoices WHERE id = ?",
-      [invoiceId]
-    );
+    await connection.query("DELETE FROM invoices WHERE id = ?", [invoiceId]);
 
     await connection.commit();
   } catch (err) {
@@ -137,7 +142,7 @@ export async function getInvoiceById(invoiceId: number) {
     FROM invoices i
     WHERE i.id = ?
     `,
-    [invoiceId]
+    [invoiceId],
   );
 
   if (invoiceRows.length === 0) {
@@ -159,7 +164,7 @@ export async function getInvoiceById(invoiceId: number) {
     JOIN products p ON p.id = ii.product_id
     WHERE ii.invoice_id = ?
     `,
-    [invoiceId]
+    [invoiceId],
   );
 
   return {
@@ -167,7 +172,7 @@ export async function getInvoiceById(invoiceId: number) {
     supplierId: Number(invoice.supplier_id),
     invoiceDate: String(invoice.invoice_date),
     paidAmount: Number(invoice.paid_amount),
-    items: itemsRows.map(row => ({
+    items: itemsRows.map((row) => ({
       id: Number(row.id),
       productId: Number(row.product_id),
       quantity: Number(row.quantity),
@@ -181,29 +186,30 @@ export async function getInvoiceById(invoiceId: number) {
   };
 }
 
-
 // تعديل فاتورة بالكامل
-export async function updateInvoiceFull(invoiceId: number, data: InvoiceFullUpdate) {
+export async function updateInvoiceFull(
+  invoiceId: number,
+  data: InvoiceFullUpdate,
+) {
   const connection = await pool.getConnection();
-  
+
   try {
     await connection.beginTransaction();
 
     // تحديث بيانات الفاتورة الأساسية
-   await connection.query(
-  `UPDATE invoices 
+    await connection.query(
+      `UPDATE invoices 
    SET supplier_id = ?, invoice_date = ?, paid_amount = ? 
    WHERE id = ?`,
-  [data.supplierId, data.invoiceDate, data.paidAmount, invoiceId]
-);
-
+      [data.supplierId, data.invoiceDate, data.paidAmount, invoiceId],
+    );
 
     // جلب العناصر الحالية
     const [existingRows] = await connection.query<RowDataPacket[]>(
       `SELECT id FROM invoice_items WHERE invoice_id = ?`,
-      [invoiceId]
+      [invoiceId],
     );
-    const existingIds = existingRows.map(r => r.id as number);
+    const existingIds = existingRows.map((r) => r.id as number);
 
     const incomingIds: number[] = [];
     let totalAmount = 0;
@@ -214,11 +220,15 @@ export async function updateInvoiceFull(invoiceId: number, data: InvoiceFullUpda
 
       if (item.id && existingIds.includes(item.id)) {
         // تحديث عنصر موجود
+        // تحويل التاريخ إلى صيغة YYYY-MM-DD
+        const dateObj = new Date(data.invoiceDate);
+        const formattedDate = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, "0")}-${String(dateObj.getDate()).padStart(2, "0")}`;
+
         await connection.query(
-          `UPDATE invoice_items 
-           SET quantity = ?, purchase_price = ?, selling_price = ?, total_cost = ?
-           WHERE id = ?`,
-          [item.quantity, item.purchasePrice, item.sellingPrice, itemTotal, item.id]
+          `UPDATE invoices 
+   SET supplier_id = ?, invoice_date = ?, paid_amount = ? 
+   WHERE id = ?`,
+          [data.supplierId, formattedDate, data.paidAmount, invoiceId], // استخدم formattedDate
         );
         incomingIds.push(item.id);
       } else if (!item.id && item.productId) {
@@ -227,26 +237,32 @@ export async function updateInvoiceFull(invoiceId: number, data: InvoiceFullUpda
           `INSERT INTO invoice_items
            (invoice_id, product_id, quantity, purchase_price, selling_price, total_cost)
            VALUES (?, ?, ?, ?, ?, ?)`,
-          [invoiceId, item.productId, item.quantity, item.purchasePrice, item.sellingPrice, itemTotal]
+          [
+            invoiceId,
+            item.productId,
+            item.quantity,
+            item.purchasePrice,
+            item.sellingPrice,
+            itemTotal,
+          ],
         );
         incomingIds.push(result.insertId);
       }
     }
 
     // حذف العناصر التي لم تعد موجودة
-    const idsToDelete = existingIds.filter(id => !incomingIds.includes(id));
+    const idsToDelete = existingIds.filter((id) => !incomingIds.includes(id));
     if (idsToDelete.length > 0) {
-      await connection.query(
-        `DELETE FROM invoice_items WHERE id IN (?)`,
-        [idsToDelete]
-      );
+      await connection.query(`DELETE FROM invoice_items WHERE id IN (?)`, [
+        idsToDelete,
+      ]);
     }
 
     // تحديث الإجمالي والمبلغ المتبقي
     const remaining = totalAmount - data.paidAmount;
     await connection.query(
       `UPDATE invoices SET total_amount = ?, remaining = ? WHERE id = ?`,
-      [totalAmount, remaining, invoiceId]
+      [totalAmount, remaining, invoiceId],
     );
 
     await connection.commit();

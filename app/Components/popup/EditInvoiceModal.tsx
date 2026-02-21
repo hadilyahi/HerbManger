@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import AddProductModal from "./AddProductModal";
 
 interface Supplier {
@@ -20,6 +20,7 @@ interface Category {
 }
 
 interface InvoiceItem {
+  id?: number;
   productId: number;
   quantity: number;
   purchasePrice: number;
@@ -36,11 +37,7 @@ interface Props {
   onSuccess: () => void;
 }
 
-export default function EditInvoiceModal({
-  invoiceId,
-  onClose,
-  onSuccess,
-}: Props) {
+export default function EditInvoiceModal({ invoiceId, onClose, onSuccess }: Props) {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -52,7 +49,6 @@ export default function EditInvoiceModal({
   const [searchTerms, setSearchTerms] = useState<Record<number, string>>({});
   const [activeDropdown, setActiveDropdown] = useState<number | null>(null);
   const [showAddProduct, setShowAddProduct] = useState(false);
-  const [currentIndex, setCurrentIndex] = useState<number | null>(null);
 
   const [items, setItems] = useState<InvoiceItem[]>([
     { productId: 0, quantity: 0, purchasePrice: 0, sellingPrice: 0 },
@@ -71,12 +67,11 @@ export default function EditInvoiceModal({
         setInvoiceDate(data.invoiceDate ?? "");
         setPaidAmount(data.paidAmount ?? 0);
 
-        const safeItems: InvoiceItem[] = Array.isArray(data.items)
-          ? data.items
-          : [];
+        const safeItems: InvoiceItem[] = Array.isArray(data.items) ? data.items : [];
 
         setItems(
           safeItems.map(item => ({
+            id: item.id,
             productId: item.productId,
             quantity: item.quantity,
             purchasePrice: item.purchasePrice,
@@ -108,29 +103,38 @@ export default function EditInvoiceModal({
   };
 
   const calculateTotal = () =>
-    items.reduce(
-      (acc, item) => acc + item.quantity * item.purchasePrice,
-      0
-    );
+    items.reduce((acc, item) => acc + item.quantity * item.purchasePrice, 0);
+
+  const updateItem = (index: number, updated: Partial<InvoiceItem>) => {
+    setItems(items.map((it, i) => (i === index ? { ...it, ...updated } : it)));
+  };
 
   /* ================= SUBMIT ================= */
   const handleSubmit = async () => {
-    await fetch(`/api/invoices/${invoiceId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        supplierId,
-        invoiceDate,
-        paidAmount,
-        items,
-      }),
-    });
+  await fetch(`/api/invoices/${invoiceId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      supplierId: Number(supplierId),
+      invoiceDate,          // أرسل التاريخ مباشرة
+      paidAmount: Number(paidAmount),
+      items: items
+        .filter(item => item.productId && item.quantity > 0)
+        .map(item => ({
+          id: item.id,
+          productId: Number(item.productId),
+          quantity: Number(item.quantity),
+          purchasePrice: Number(item.purchasePrice),
+          sellingPrice: Number(item.sellingPrice),
+        })),
+    }),
+  });
 
-    onSuccess();
-    onClose();
-  };
+  onSuccess();
+  onClose();
+};
 
-  /* ================= UI (نفس Create) ================= */
+  /* ================= UI ================= */
   return (
     <>
       <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
@@ -138,9 +142,7 @@ export default function EditInvoiceModal({
 
           {/* HEADER */}
           <div className="p-8 text-center border-b bg-[#f3f6f3]">
-            <h2 className="text-3xl font-bold text-gray-800">
-              تعديل الفاتورة
-            </h2>
+            <h2 className="text-3xl font-bold text-gray-800">تعديل الفاتورة</h2>
           </div>
 
           {/* BODY */}
@@ -149,9 +151,7 @@ export default function EditInvoiceModal({
             {/* Supplier + Date */}
             <div className="grid grid-cols-2 gap-10 mb-12">
               <div>
-                <label className="block mb-3 font-semibold text-gray-700">
-                  اسم المورد
-                </label>
+                <label className="block mb-3 font-semibold text-gray-700">اسم المورد</label>
                 <select
                   value={supplierId}
                   onChange={e => setSupplierId(e.target.value)}
@@ -159,17 +159,13 @@ export default function EditInvoiceModal({
                 >
                   <option value="">اسم المورد</option>
                   {suppliers.map(s => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
+                    <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="block mb-3 font-semibold text-gray-700">
-                  تاريخ الفاتورة
-                </label>
+                <label className="block mb-3 font-semibold text-gray-700">تاريخ الفاتورة</label>
                 <input
                   type="date"
                   value={invoiceDate || ""}
@@ -191,7 +187,6 @@ export default function EditInvoiceModal({
             {/* ITEMS */}
             {items.map((item, index) => {
               const rowTotal = item.quantity * item.purchasePrice;
-
               return (
                 <div key={index} className="grid grid-cols-5 gap-6 mb-6 items-center">
 
@@ -208,22 +203,15 @@ export default function EditInvoiceModal({
                         className="bg-[#dfe8df] p-3 rounded-2xl w-full"
                         placeholder="ابحث عن المنتج..."
                       />
-
                       {activeDropdown === index && (
                         <div className="absolute top-full left-0 w-full bg-white shadow-lg rounded-xl max-h-40 overflow-y-auto z-50">
                           {products
-                            .filter(p =>
-                              p.name.toLowerCase().includes(
-                                (searchTerms[index] || "").toLowerCase()
-                              )
-                            )
+                            .filter(p => p.name.toLowerCase().includes((searchTerms[index] || "").toLowerCase()))
                             .map(p => (
                               <div
                                 key={p.id}
                                 onClick={() => {
-                                  const newItems = [...items];
-                                  newItems[index].productId = p.id;
-                                  setItems(newItems);
+                                  updateItem(index, { productId: p.id });
                                   setSearchTerms({ ...searchTerms, [index]: p.name });
                                   setActiveDropdown(null);
                                 }}
@@ -237,10 +225,7 @@ export default function EditInvoiceModal({
                     </div>
 
                     <button
-                      onClick={() => {
-                        setCurrentIndex(index);
-                        setShowAddProduct(true);
-                      }}
+                      onClick={() => setShowAddProduct(true)}
                       className="bg-green-600 text-white px-3 rounded-xl"
                     >
                       <Plus size={16} />
@@ -251,33 +236,21 @@ export default function EditInvoiceModal({
                     type="number"
                     value={item.purchasePrice}
                     className="bg-[#dfe8df] p-3 rounded-2xl text-center"
-                    onChange={e => {
-                      const newItems = [...items];
-                      newItems[index].purchasePrice = +e.target.value;
-                      setItems(newItems);
-                    }}
+                    onChange={e => updateItem(index, { purchasePrice: +e.target.value })}
                   />
 
                   <input
                     type="number"
                     value={item.quantity}
                     className="bg-[#dfe8df] p-3 rounded-2xl text-center"
-                    onChange={e => {
-                      const newItems = [...items];
-                      newItems[index].quantity = +e.target.value;
-                      setItems(newItems);
-                    }}
+                    onChange={e => updateItem(index, { quantity: +e.target.value })}
                   />
 
                   <input
                     type="number"
                     value={item.sellingPrice}
                     className="bg-[#dfe8df] p-3 rounded-2xl text-center"
-                    onChange={e => {
-                      const newItems = [...items];
-                      newItems[index].sellingPrice = +e.target.value;
-                      setItems(newItems);
-                    }}
+                    onChange={e => updateItem(index, { sellingPrice: +e.target.value })}
                   />
 
                   <div className="flex items-center justify-between bg-[#dfe8df] p-3 rounded-2xl">
@@ -296,33 +269,25 @@ export default function EditInvoiceModal({
 
             {/* ADD ITEM */}
             <div className="flex justify-end mb-12">
-              <button
-                onClick={addItem}
-                className="flex items-center gap-2 text-gray-500 font-semibold"
-              >
-                <Plus size={18} />
-                إضافة منتج آخر
+              <button onClick={addItem} className="flex items-center gap-2 text-gray-500 font-semibold">
+                <Plus size={18}/> إضافة منتج آخر
               </button>
             </div>
 
             {/* TOTALS */}
             <div className="grid grid-cols-2 gap-10 mb-10">
               <div>
-                <label className="block mb-3 font-semibold">
-                  المبلغ المدفوع
-                </label>
+                <label className="block mb-3 font-semibold">المبلغ المدفوع</label>
                 <input
                   type="number"
                   value={paidAmount}
-                  onChange={e => setPaidAmount(+e.target.value)}
+                  onChange={e => setPaidAmount(Number(e.target.value) || 0)}
                   className="w-full bg-[#dfe8df] p-4 rounded-2xl text-center"
                 />
               </div>
 
               <div>
-                <label className="block mb-3 font-semibold">
-                  السعر الإجمالي للفاتورة كاملة
-                </label>
+                <label className="block mb-3 font-semibold">السعر الإجمالي للفاتورة كاملة</label>
                 <div className="bg-[#dfe8df] p-4 rounded-2xl text-center">
                   {calculateTotal().toFixed(2)} دج
                 </div>
@@ -330,9 +295,7 @@ export default function EditInvoiceModal({
             </div>
 
             <div className="text-center">
-              <label className="block mb-3 font-semibold">
-                المبلغ المتبقي
-              </label>
+              <label className="block mb-3 font-semibold">المبلغ المتبقي</label>
               <div className="bg-[#dfe8df] p-4 rounded-2xl w-[300px] mx-auto text-center">
                 {(calculateTotal() - paidAmount).toFixed(2)} دج
               </div>
@@ -341,17 +304,10 @@ export default function EditInvoiceModal({
 
           {/* FOOTER */}
           <div className="p-8 flex justify-center gap-16 bg-[#f3f6f3]">
-            <button
-              onClick={onClose}
-              className="bg-red-600 text-white px-14 py-3 rounded-2xl text-lg font-semibold shadow"
-            >
+            <button onClick={onClose} className="bg-red-600 text-white px-14 py-3 rounded-2xl text-lg font-semibold shadow">
               إلغاء
             </button>
-
-            <button
-              onClick={handleSubmit}
-              className="bg-blue-700 text-white px-14 py-3 rounded-2xl text-lg font-semibold shadow"
-            >
+            <button onClick={handleSubmit} className="bg-blue-700 text-white px-14 py-3 rounded-2xl text-lg font-semibold shadow">
               حفظ التعديل
             </button>
           </div>
@@ -363,9 +319,7 @@ export default function EditInvoiceModal({
         <AddProductModal
           categories={categories}
           onClose={() => setShowAddProduct(false)}
-          onSuccess={() =>
-            fetch("/api/products").then(res => res.json()).then(setProducts)
-          }
+          onSuccess={() => fetch("/api/products").then(res => res.json()).then(setProducts)}
         />
       )}
     </>

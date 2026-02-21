@@ -38,6 +38,7 @@ export async function DELETE(
 }
 
 // ✅ PUT - تحديث الفاتورة بالكامل
+// ✅ PUT - تحديث الفاتورة بالكامل
 export async function PUT(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
@@ -50,11 +51,15 @@ export async function PUT(
     }
 
     const body = await req.json();
-    const { supplierId, paidAmount, items } = body;
+    const { supplierId, paidAmount, items, invoiceDate } = body;
 
-    if (!supplierId || !Array.isArray(items) || isNaN(Number(paidAmount))) {
+    if (!supplierId || !Array.isArray(items) || isNaN(Number(paidAmount)) || !invoiceDate) {
       return NextResponse.json({ error: "Invalid data" }, { status: 400 });
     }
+
+    // تحويل التاريخ إلى صيغة MySQL YYYY-MM-DD
+    const dateObj = new Date(invoiceDate);
+    const formattedDate = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2,'0')}-${String(dateObj.getDate()).padStart(2,'0')}`;
 
     // تحويل العناصر إلى النوع الصحيح
     const parsedItems: InvoiceItemUpdate[] = items.map((i: {
@@ -69,7 +74,7 @@ export async function PUT(
       }
 
       return {
-        id: i.id ? Number(i.id) : 0, // 0 أو أي قيمة مؤقتة للعنصر الجديد
+        id: i.id ? Number(i.id) : 0, // قيمة مؤقتة للعنصر الجديد
         productId: i.productId ? Number(i.productId) : undefined,
         quantity: Number(i.quantity),
         purchasePrice: Number(i.purchasePrice),
@@ -81,7 +86,7 @@ export async function PUT(
       supplierId: Number(supplierId),
       paidAmount: Number(paidAmount),
       items: parsedItems,
-      invoiceDate: body.invoiceDate, // تأكد من إرسال هذا الحقل من العميل
+      invoiceDate: formattedDate, // استخدم التاريخ بصيغة YYYY-MM-DD
     });
 
     return NextResponse.json({ success: true });
