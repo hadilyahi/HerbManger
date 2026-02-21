@@ -38,7 +38,7 @@ export default function CreateInvoiceModal({
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]); // 👈 جديد
-
+  const [searchTerms, setSearchTerms] = useState<{ [key: number]: string }>({});
   const [supplierId, setSupplierId] = useState("");
   const [invoiceDate, setInvoiceDate] = useState("");
   const [paidAmount, setPaidAmount] = useState(0);
@@ -165,22 +165,49 @@ export default function CreateInvoiceModal({
                 >
                   {/* 🔥 PRODUCT + ADD BUTTON */}
                   <div className="flex gap-2">
-                    <select
-                      className="bg-[#dfe8df] p-3 rounded-2xl w-full"
-                      value={item.productId || ""}
-                      onChange={(e) => {
-                        const newItems = [...items];
-                        newItems[index].productId = Number(e.target.value);
-                        setItems(newItems);
-                      }}
-                    >
-                      <option value="">اختر المنتج ...</option>
-                      {products.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="relative w-full">
+  <input
+    type="text"
+    placeholder="ابحث عن المنتج..."
+    value={searchTerms[index] || ""}
+    onChange={(e) => {
+      setSearchTerms({
+        ...searchTerms,
+        [index]: e.target.value,
+      });
+    }}
+    className="bg-[#dfe8df] p-3 rounded-2xl w-full"
+  />
+
+  {searchTerms[index] && (
+    <div className="absolute top-full left-0 w-full bg-white shadow-lg rounded-xl max-h-40 overflow-y-auto z-50">
+      {products
+        .filter((p) =>
+          p.name
+            .toLowerCase()
+            .includes(searchTerms[index].toLowerCase())
+        )
+        .map((p) => (
+          <div
+            key={p.id}
+            onClick={() => {
+              const newItems = [...items];
+              newItems[index].productId = p.id;
+              setItems(newItems);
+
+              setSearchTerms({
+                ...searchTerms,
+                [index]: p.name,
+              });
+            }}
+            className="p-2 hover:bg-gray-100 cursor-pointer"
+          >
+            {p.name}
+          </div>
+        ))}
+    </div>
+  )}
+</div>
 
                     <button
                       type="button"
