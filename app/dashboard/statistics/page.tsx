@@ -1,20 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState, ReactElement } from "react";
 import {
   LineChart,
   Line,
   XAxis,
   YAxis,
   Tooltip,
-  Legend,
   BarChart,
   Bar,
-  PieChart,
-  Pie,
-  Cell,
+  ResponsiveContainer,
 } from "recharts";
 
+/* =======================
+   Interfaces
+======================= */
 interface ProductStat {
   month: number;
   total_quantity: number;
@@ -26,7 +26,6 @@ interface TopProduct {
   product_id: number;
   product_name: string;
   total_quantity: number;
-  total_amount: number;
 }
 
 interface SupplierDebt {
@@ -42,17 +41,22 @@ interface Product {
   name: string;
 }
 
-const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#AA336A", "#FF6699"];
-
+/* =======================
+   Page
+======================= */
 export default function StatisticsPage() {
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [productId, setProductId] = useState<number | null>(null);
+  const [search, setSearch] = useState("");
 
   const [productStats, setProductStats] = useState<ProductStat[]>([]);
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   const [suppliersDebt, setSuppliersDebt] = useState<SupplierDebt[]>([]);
   const [productsList, setProductsList] = useState<Product[]>([]);
 
+  /* =======================
+     Fetch data
+  ======================= */
   useEffect(() => {
     fetch(
       `/api/statistics?year=${year}${productId ? `&productId=${productId}` : ""}`
@@ -64,34 +68,61 @@ export default function StatisticsPage() {
         setSuppliersDebt(data.suppliersDebt || []);
         setProductsList(data.productsList || []);
       })
-      .catch((err) => console.error(err));
+      .catch(console.error);
   }, [year, productId]);
 
-  // تحويل بيانات المنتج لكل شهر لتسهيل الرسم
+  /* =======================
+     Monthly chart data
+  ======================= */
   const monthlyData = Array.from({ length: 12 }, (_, i) => {
-    const monthStat = productStats.find((ps) => ps.month === i + 1);
+    const stat = productStats.find((p) => p.month === i + 1);
     return {
       month: `شهر ${i + 1}`,
-      quantity: monthStat?.total_quantity || 0,
-      purchasePrice: monthStat?.avg_purchase_price || 0,
-      sellingPrice: monthStat?.avg_selling_price || 0,
+      quantity: stat?.total_quantity ?? 0,
+      purchasePrice: stat?.avg_purchase_price ?? 0,
+      sellingPrice: stat?.avg_selling_price ?? 0,
     };
   });
 
+  /* =======================
+     Search products
+  ======================= */
+  const filteredProducts = useMemo(
+    () =>
+      productsList.filter((p) =>
+        p.name.toLowerCase().includes(search.toLowerCase())
+      ),
+    [productsList, search]
+  );
+
+  /* =======================
+     Top products by quantity
+  ======================= */
+  const sortedTopProducts = useMemo(
+    () =>
+      [...topProducts].sort(
+        (a, b) => b.total_quantity - a.total_quantity
+      ),
+    [topProducts]
+  );
+
+  /* =======================
+     Render
+  ======================= */
   return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold mb-6 text-center">
-        إحصائيات الفواتير والمنتجات
+    <div className="p-8 space-y-12">
+      <h1 className="text-3xl font-bold text-center">
+        لوحة الإحصائيات
       </h1>
 
-      {/* فلترة السنة والمنتج */}
-      <div className="mb-8 flex justify-center gap-4">
+      {/* ================= Filters ================= */}
+      <div className="flex flex-wrap justify-center gap-6 bg-white p-6 rounded-xl shadow">
         <div>
-          <label>اختر السنة: </label>
+          <label className="block mb-1 font-medium">السنة</label>
           <select
             value={year}
             onChange={(e) => setYear(Number(e.target.value))}
-            className="border px-2 py-1 rounded"
+            className="border rounded px-3 py-2"
           >
             {[2026, 2025, 2024].map((y) => (
               <option key={y} value={y}>
@@ -101,17 +132,24 @@ export default function StatisticsPage() {
           </select>
         </div>
 
-        <div>
-          <label>اختر المنتج: </label>
+        <div className="w-64">
+          <label className="block mb-1 font-medium">المنتج</label>
+          <input
+            type="text"
+            placeholder="بحث عن منتج..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full border rounded px-3 py-2 mb-2"
+          />
           <select
-            value={productId || ""}
+            className="w-full border rounded px-3 py-2"
+            value={productId ?? ""}
             onChange={(e) =>
               setProductId(e.target.value ? Number(e.target.value) : null)
             }
-            className="border px-2 py-1 rounded"
           >
-            <option value="">-- جميع المنتجات --</option>
-            {productsList.map((p) => (
+            <option value="">جميع المنتجات</option>
+            {filteredProducts.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>
@@ -120,83 +158,120 @@ export default function StatisticsPage() {
         </div>
       </div>
 
-      {/* تطور المنتج */}
+      {/* ================= Product Charts ================= */}
       {productId && (
-        <section className="mb-12 border p-4 rounded">
-          <h2 className="text-xl font-semibold mb-4">
-            تطور المنتج المختار شهريًا
-          </h2>
-          <LineChart width={700} height={250} data={monthlyData}>
-            <XAxis dataKey="month" />
-            <YAxis />
-            <Tooltip />
-            <Legend />
-            <Line
-              type="monotone"
-              dataKey="quantity"
-              stroke="#8884d8"
-              name="الكمية"
-            />
-            <Line
-              type="monotone"
-              dataKey="purchasePrice"
-              stroke="#82ca9d"
-              name="سعر الشراء"
-            />
-            <Line
-              type="monotone"
-              dataKey="sellingPrice"
-              stroke="#FF8042"
-              name="سعر البيع"
-            />
-          </LineChart>
-        </section>
+        <div className="grid lg:grid-cols-2 gap-8">
+          <ChartCard title="تطور الكمية">
+            <LineChart data={monthlyData}>
+              <XAxis dataKey="month" />
+              <YAxis />
+              <Tooltip />
+              <Line
+                dataKey="quantity"
+                stroke="#6366f1"
+                strokeWidth={3}
+              />
+            </LineChart>
+          </ChartCard>
+
+          <ChartCard title="تطور سعر الشراء">
+            <LineChart data={monthlyData}>
+              <XAxis dataKey="month" />
+              <YAxis />
+              <Tooltip />
+              <Line
+                dataKey="purchasePrice"
+                stroke="#10b981"
+                strokeWidth={3}
+              />
+            </LineChart>
+          </ChartCard>
+
+          <ChartCard title="تطور سعر البيع">
+            <LineChart data={monthlyData}>
+              <XAxis dataKey="month" />
+              <YAxis />
+              <Tooltip />
+              <Line
+                dataKey="sellingPrice"
+                stroke="#f97316"
+                strokeWidth={3}
+              />
+            </LineChart>
+          </ChartCard>
+        </div>
       )}
 
-      {/* المنتجات الأكثر شراءً */}
-      <section className="mb-12">
-        <h2 className="text-xl font-semibold mb-4">المنتجات الأكثر شراءً</h2>
-        <BarChart width={700} height={300} data={topProducts}>
+      {/* ================= Top Products ================= */}
+      <ChartCard title="المنتجات الأكثر شراءً (حسب الكمية)">
+        <BarChart data={sortedTopProducts}>
           <XAxis dataKey="product_name" />
           <YAxis />
           <Tooltip />
-          <Legend />
-          <Bar dataKey="total_quantity" fill="#8884d8" name="الكمية" />
-          <Bar dataKey="total_amount" fill="#82ca9d" name="المبلغ" />
+          <Bar dataKey="total_quantity" fill="#6366f1" />
         </BarChart>
-      </section>
+      </ChartCard>
 
-    
-      {/* الديون والمدفوعات للموردين */}
-<section className="mb-12">
-  <h2 className="text-xl font-semibold ">الديون والمدفوعات للموردين</h2>
+      {/* ================= Suppliers Debt ================= */}
+      <div className="bg-white p-6 rounded-xl shadow">
+        <h2 className="text-xl font-semibold mb-4">
+          الديون والمدفوعات للموردين
+        </h2>
 
+        <div className="overflow-x-auto">
+          <table className="w-full text-right border">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="p-3">المورد</th>
+                <th className="p-3">إجمالي الفواتير</th>
+                <th className="p-3">المدفوع</th>
+                <th className="p-3">المتبقي</th>
+              </tr>
+            </thead>
+            <tbody>
+              {suppliersDebt.map((s) => (
+                <tr
+                  key={s.supplier_id}
+                  className="hover:bg-gray-50"
+                >
+                  <td className="p-3">{s.supplier_name}</td>
+                  <td className="p-3">
+                    {s.total_invoices.toLocaleString()} دج
+                  </td>
+                  <td className="p-3 text-green-600">
+                    {s.paid.toLocaleString()} دج
+                  </td>
+                  <td className="p-3 text-red-600">
+                    {s.remaining.toLocaleString()} دج
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-  {/* جدول الديون والمدفوعات */}
-  <div className="overflow-x-auto mt-6">
-    <table className="w-full border-collapse border border-gray-300 text-right">
-      <thead className="bg-gray-200 font-bold">
-        <tr>
-          <th className="p-3 border border-gray-300">المورد</th>
-          <th className="p-3 border border-gray-300">إجمالي الفواتير</th>
-          <th className="p-3 border border-gray-300">المدفوع</th>
-          <th className="p-3 border border-gray-300">المتبقي</th>
-        </tr>
-      </thead>
-      <tbody>
-        {suppliersDebt.map((supplier) => (
-          <tr key={supplier.supplier_id} className="hover:bg-gray-100">
-            <td className="p-3 border border-gray-300">{supplier.supplier_name}</td>
-            <td className="p-3 border border-gray-300">{supplier.total_invoices.toLocaleString()} دج</td>
-            <td className="p-3 border border-gray-300">{supplier.paid.toLocaleString()} دج</td>
-            <td className="p-3 border border-gray-300">{supplier.remaining.toLocaleString()} دج</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-</section>
-
+/* =======================
+   Reusable Chart Card
+======================= */
+function ChartCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactElement;
+}) {
+  return (
+    <div className="bg-white p-6 rounded-xl shadow space-y-4">
+      <h3 className="font-semibold text-lg">{title}</h3>
+      <div className="h-72">
+        <ResponsiveContainer width="100%" height="100%">
+          {children}
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
