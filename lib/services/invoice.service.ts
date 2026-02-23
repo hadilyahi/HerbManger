@@ -214,41 +214,30 @@ export async function updateInvoiceFull(
     const incomingIds: number[] = [];
     let totalAmount = 0;
 
-    for (const item of data.items) {
-      const itemTotal = item.quantity * item.purchasePrice;
-      totalAmount += itemTotal;
+   for (const item of data.items) {
+  const itemTotal = item.quantity * item.purchasePrice;
+  totalAmount += itemTotal;
 
-      if (item.id && existingIds.includes(item.id)) {
-        // تحديث عنصر موجود
-        // تحويل التاريخ إلى صيغة YYYY-MM-DD
-        const dateObj = new Date(data.invoiceDate);
-        const formattedDate = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, "0")}-${String(dateObj.getDate()).padStart(2, "0")}`;
-
-        await connection.query(
-          `UPDATE invoices 
-   SET supplier_id = ?, invoice_date = ?, paid_amount = ? 
-   WHERE id = ?`,
-          [data.supplierId, formattedDate, data.paidAmount, invoiceId], // استخدم formattedDate
-        );
-        incomingIds.push(item.id);
-      } else if (!item.id && item.productId) {
-        // إضافة عنصر جديد
-        const [result] = await connection.query<ResultSetHeader>(
-          `INSERT INTO invoice_items
-           (invoice_id, product_id, quantity, purchase_price, selling_price, total_cost)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [
-            invoiceId,
-            item.productId,
-            item.quantity,
-            item.purchasePrice,
-            item.sellingPrice,
-            itemTotal,
-          ],
-        );
-        incomingIds.push(result.insertId);
-      }
-    }
+  if (item.id && existingIds.includes(item.id)) {
+    // ✅ تحديث عنصر موجود
+    await connection.query(
+      `UPDATE invoice_items
+       SET product_id = ?, quantity = ?, purchase_price = ?, selling_price = ?, total_cost = ?
+       WHERE id = ?`,
+      [item.productId, item.quantity, item.purchasePrice, item.sellingPrice, itemTotal, item.id]
+    );
+    incomingIds.push(item.id);
+  } else if (!item.id && item.productId) {
+    // ✅ إضافة عنصر جديد
+    const [result] = await connection.query<ResultSetHeader>(
+      `INSERT INTO invoice_items
+       (invoice_id, product_id, quantity, purchase_price, selling_price, total_cost)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [invoiceId, item.productId, item.quantity, item.purchasePrice, item.sellingPrice, itemTotal]
+    );
+    incomingIds.push(result.insertId);
+  }
+}
 
     // حذف العناصر التي لم تعد موجودة
     const idsToDelete = existingIds.filter((id) => !incomingIds.includes(id));

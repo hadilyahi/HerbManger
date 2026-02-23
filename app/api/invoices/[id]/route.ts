@@ -63,24 +63,24 @@ export async function PUT(
 
     // تحويل العناصر إلى النوع الصحيح
     const parsedItems: InvoiceItemUpdate[] = items.map((i: {
-      id?: number;
-      productId?: number;
-      quantity: number;
-      purchasePrice: number;
-      sellingPrice: number;
-    }) => {
-      if (!i.id && !i.productId) {
-        throw new Error("Each item must have either an existing id or a productId");
-      }
+  id?: number;
+  productId?: number;
+  quantity: number;
+  purchasePrice: number;
+  sellingPrice: number;
+}) => {
+  if (!i.productId) {
+    throw new Error("Each item must have a productId");
+  }
 
-      return {
-        id: i.id ? Number(i.id) : 0, // قيمة مؤقتة للعنصر الجديد
-        productId: i.productId ? Number(i.productId) : undefined,
-        quantity: Number(i.quantity),
-        purchasePrice: Number(i.purchasePrice),
-        sellingPrice: Number(i.sellingPrice),
-      };
-    });
+  return {
+    id: i.id ? Number(i.id) : undefined, // ✅ مهم جدًا
+    productId: Number(i.productId),
+    quantity: Number(i.quantity),
+    purchasePrice: Number(i.purchasePrice),
+    sellingPrice: Number(i.sellingPrice),
+  };
+});
 
     await updateInvoiceFull(invoiceId, {
       supplierId: Number(supplierId),
