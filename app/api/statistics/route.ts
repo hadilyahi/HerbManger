@@ -10,19 +10,32 @@ export async function GET(req: Request) {
     const year = yearParam ? Number(yearParam) : new Date().getFullYear();
     const productId = productIdParam ? Number(productIdParam) : undefined;
 
-    // تحقق من صحة المدخلات
-    if (isNaN(year)) 
-      return NextResponse.json({ message: "السنة غير صحيحة" }, { status: 400 });
-    if (productIdParam && (productId === undefined || isNaN(productId))) 
-      return NextResponse.json({ message: "المنتج غير صحيح" }, { status: 400 });
+    // =======================
+    // Validate inputs
+    // =======================
+    if (isNaN(year)) {
+      return NextResponse.json(
+        { message: "السنة غير صحيحة" },
+        { status: 400 }
+      );
+    }
 
-    // 1️⃣ إحصائيات المنتج المحدد (كمية وسعر شهري)
+    if (productIdParam && (productId === undefined || isNaN(productId))) {
+      return NextResponse.json(
+        { message: "المنتج غير صحيح" },
+        { status: 400 }
+      );
+    }
+
+    // =======================
+    // 1️⃣ إحصائيات المنتج (حسب تاريخ الفاتورة)
+    // =======================
     let productStatsQuery = `
       SELECT 
-        MONTH(i.invoice_date) AS month,
+        DATE(i.invoice_date) AS invoice_date,
         SUM(ii.quantity) AS total_quantity,
-        AVG(ii.purchase_price) AS avg_purchase_price,
-        AVG(ii.selling_price) AS avg_selling_price
+        AVG(ii.purchase_price) AS purchase_price,
+        AVG(ii.selling_price) AS selling_price
       FROM invoice_items ii
       JOIN invoices i ON ii.invoice_id = i.id
       WHERE YEAR(i.invoice_date) = ?
@@ -30,18 +43,26 @@ export async function GET(req: Request) {
 
     const queryParams: number[] = [year];
 
-    // ✅ إضافة فلتر المنتج فقط إذا تم اختيار منتج محدد
     if (productId !== undefined) {
       productStatsQuery += ` AND ii.product_id = ?`;
-      queryParams.push(productId); // TypeScript متأكد أنه number فقط
+      queryParams.push(productId);
     }
 
-    productStatsQuery += ` GROUP BY MONTH(i.invoice_date) ORDER BY MONTH(i.invoice_date)`;
+    productStatsQuery += `
+      GROUP BY DATE(i.invoice_date)
+      ORDER BY DATE(i.invoice_date)
+    `;
 
-    const [productStatsRows] = await pool.query(productStatsQuery, queryParams);
+    const [productStatsRows] = await pool.query(
+      productStatsQuery,
+      queryParams
+    );
 
+    // =======================
     // 2️⃣ المنتجات الأكثر شراءً (حسب السنة)
-    const [topProductsRows] = await pool.query(`
+    // =======================
+    const [topProductsRows] = await pool.query(
+      `
       SELECT 
         p.id AS product_id,
         p.name AS product_name,
@@ -54,10 +75,15 @@ export async function GET(req: Request) {
       GROUP BY p.id, p.name
       ORDER BY total_quantity DESC
       LIMIT 10
-    `, [year]);
+    `,
+      [year]
+    );
 
+    // =======================
     // 3️⃣ الديون والمدفوعات للموردين
-    const [suppliersDebtRows] = await pool.query(`
+    // =======================
+    const [suppliersDebtRows] = await pool.query(
+      `
       SELECT 
         s.id AS supplier_id,
         s.name AS supplier_name,
@@ -69,22 +95,31 @@ export async function GET(req: Request) {
       WHERE YEAR(i.invoice_date) = ?
       GROUP BY s.id, s.name
       ORDER BY remaining DESC
-    `, [year]);
+    `,
+      [year]
+    );
 
-    // 4️⃣ قائمة المنتجات لاستخدامها في Dropdown
+    // =======================
+    // 4️⃣ قائمة المنتجات (Dropdown)
+    // =======================
     const [productsListRows] = await pool.query(`
       SELECT id, name FROM products ORDER BY name
     `);
 
+    // =======================
+    // Response
+    // =======================
     return NextResponse.json({
       productStats: productStatsRows,
       topProducts: topProductsRows,
       suppliersDebt: suppliersDebtRows,
       productsList: productsListRows,
     });
-
   } catch (err) {
     console.error(err);
-    return NextResponse.json({ message: "حدث خطأ أثناء استخراج الإحصائيات" }, { status: 500 });
+    return NextResponse.json(
+      { message: "حدث خطأ أثناء استخراج الإحصائيات" },
+      { status: 500 }
+    );
   }
 }

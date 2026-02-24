@@ -16,10 +16,10 @@ import {
    Interfaces
 ======================= */
 interface ProductStat {
-  month: number;
+  invoice_date: string; // YYYY-MM-DD
   total_quantity: number;
-  avg_purchase_price: number;
-  avg_selling_price: number;
+  purchase_price: number;
+  selling_price: number;
 }
 
 interface TopProduct {
@@ -72,17 +72,29 @@ export default function StatisticsPage() {
   }, [year, productId]);
 
   /* =======================
-     Monthly chart data
+     Chart data (by invoice date)
   ======================= */
-  const monthlyData = Array.from({ length: 12 }, (_, i) => {
-    const stat = productStats.find((p) => p.month === i + 1);
-    return {
-      month: `شهر ${i + 1}`,
-      quantity: stat?.total_quantity ?? 0,
-      purchasePrice: stat?.avg_purchase_price ?? 0,
-      sellingPrice: stat?.avg_selling_price ?? 0,
-    };
-  });
+  const chartData = useMemo(
+    () =>
+      productStats.map((p) => ({
+        date: p.invoice_date,
+        quantity: p.total_quantity,
+        purchasePrice: p.purchase_price,
+        sellingPrice: p.selling_price,
+      })),
+    [productStats]
+  );
+
+  /* =======================
+     Date formatter
+  ======================= */
+  const formatDate = (date: string) => {
+    const d = new Date(date);
+    return d.toLocaleDateString("ar-DZ", {
+      day: "2-digit",
+      month: "short",
+    });
+  };
 
   /* =======================
      Search products
@@ -162,10 +174,26 @@ export default function StatisticsPage() {
       {productId && (
         <div className="grid lg:grid-cols-2 gap-8">
           <ChartCard title="تطور الكمية">
-            <LineChart data={monthlyData}>
-              <XAxis dataKey="month" />
+            <LineChart data={chartData}>
+              <XAxis
+                dataKey="date"
+                tickFormatter={formatDate}
+                angle={-45}
+                textAnchor="end"
+                height={60}
+                interval="preserveStartEnd"
+              />
               <YAxis />
-              <Tooltip />
+              <Tooltip
+                labelFormatter={(label) =>
+                  new Date(label).toLocaleDateString("ar-DZ", {
+                    weekday: "long",
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })
+                }
+              />
               <Line
                 dataKey="quantity"
                 stroke="#6366f1"
@@ -175,10 +203,26 @@ export default function StatisticsPage() {
           </ChartCard>
 
           <ChartCard title="تطور سعر الشراء">
-            <LineChart data={monthlyData}>
-              <XAxis dataKey="month" />
+            <LineChart data={chartData}>
+              <XAxis
+                dataKey="date"
+                tickFormatter={formatDate}
+                angle={-45}
+                textAnchor="end"
+                height={60}
+                interval="preserveStartEnd"
+              />
               <YAxis />
-              <Tooltip />
+              <Tooltip
+                labelFormatter={(label) =>
+                  new Date(label).toLocaleDateString("ar-DZ", {
+                    weekday: "long",
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })
+                }
+              />
               <Line
                 dataKey="purchasePrice"
                 stroke="#10b981"
@@ -188,10 +232,26 @@ export default function StatisticsPage() {
           </ChartCard>
 
           <ChartCard title="تطور سعر البيع">
-            <LineChart data={monthlyData}>
-              <XAxis dataKey="month" />
+            <LineChart data={chartData}>
+              <XAxis
+                dataKey="date"
+                tickFormatter={formatDate}
+                angle={-45}
+                textAnchor="end"
+                height={60}
+                interval="preserveStartEnd"
+              />
               <YAxis />
-              <Tooltip />
+              <Tooltip
+                labelFormatter={(label) =>
+                  new Date(label).toLocaleDateString("ar-DZ", {
+                    weekday: "long",
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })
+                }
+              />
               <Line
                 dataKey="sellingPrice"
                 stroke="#f97316"
