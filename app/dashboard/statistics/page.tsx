@@ -16,7 +16,7 @@ import {
    Interfaces
 ======================= */
 interface ProductStat {
-  invoice_date: string; // YYYY-MM-DD
+  invoice_date: string;
   total_quantity: number;
   purchase_price: number;
   selling_price: number;
@@ -45,7 +45,9 @@ interface Product {
    Page
 ======================= */
 export default function StatisticsPage() {
-  const [year, setYear] = useState<number>(new Date().getFullYear());
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+
   const [productId, setProductId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
 
@@ -58,8 +60,12 @@ export default function StatisticsPage() {
      Fetch data
   ======================= */
   useEffect(() => {
+    if (!startDate || !endDate) return;
+
     fetch(
-      `/api/statistics?year=${year}${productId ? `&productId=${productId}` : ""}`
+      `/api/statistics?startDate=${startDate}&endDate=${endDate}${
+        productId ? `&productId=${productId}` : ""
+      }`
     )
       .then((res) => res.json())
       .then((data) => {
@@ -69,28 +75,42 @@ export default function StatisticsPage() {
         setProductsList(data.productsList || []);
       })
       .catch(console.error);
-  }, [year, productId]);
+  }, [startDate, endDate, productId]);
 
   /* =======================
-     Chart data (by invoice date)
+     Auto default (آخر 30 يوم)
+  ======================= */
+  useEffect(() => {
+    const today = new Date();
+    const lastMonth = new Date();
+    lastMonth.setDate(today.getDate() - 30);
+
+    setStartDate(lastMonth.toISOString().split("T")[0]);
+    setEndDate(today.toISOString().split("T")[0]);
+  }, []);
+
+  /* =======================
+     🔥 FIX: chart data (timestamp)
   ======================= */
   const chartData = useMemo(
     () =>
-      productStats.map((p) => ({
-        date: p.invoice_date,
-        quantity: p.total_quantity,
-        purchasePrice: p.purchase_price,
-        sellingPrice: p.selling_price,
-      })),
+      productStats
+        .map((p) => ({
+          date: new Date(p.invoice_date).getTime(), // مهم جدًا
+          label: p.invoice_date,
+          quantity: p.total_quantity,
+          purchasePrice: p.purchase_price,
+          sellingPrice: p.selling_price,
+        }))
+        .sort((a, b) => a.date - b.date), // مهم للترتيب بين السنوات
     [productStats]
   );
 
   /* =======================
      Date formatter
   ======================= */
-  const formatDate = (date: string) => {
-    const d = new Date(date);
-    return d.toLocaleDateString("ar-DZ", {
+  const formatDate = (value: number) => {
+    return new Date(value).toLocaleDateString("ar-DZ", {
       day: "2-digit",
       month: "short",
     });
@@ -108,7 +128,7 @@ export default function StatisticsPage() {
   );
 
   /* =======================
-     Top products by quantity
+     Top products
   ======================= */
   const sortedTopProducts = useMemo(
     () =>
@@ -118,9 +138,6 @@ export default function StatisticsPage() {
     [topProducts]
   );
 
-  /* =======================
-     Render
-  ======================= */
   return (
     <div className="p-8 space-y-12">
       <h1 className="text-3xl font-bold text-center">
@@ -129,19 +146,25 @@ export default function StatisticsPage() {
 
       {/* ================= Filters ================= */}
       <div className="flex flex-wrap justify-center gap-6 bg-white p-6 rounded-xl shadow">
-        <div>
-          <label className="block mb-1 font-medium">السنة</label>
-          <select
-            value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
+
+        <div className="flex flex-col">
+          <label className="block mb-1 font-medium">من تاريخ</label>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
             className="border rounded px-3 py-2"
-          >
-            {[2026, 2025, 2024].map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
+          />
+        </div>
+
+        <div className="flex flex-col">
+          <label className="block mb-1 font-medium">إلى تاريخ</label>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="border rounded px-3 py-2"
+          />
         </div>
 
         <div className="w-64">
@@ -173,25 +196,22 @@ export default function StatisticsPage() {
       {/* ================= Product Charts ================= */}
       {productId && (
         <div className="grid lg:grid-cols-2 gap-8">
+
           <ChartCard title="تطور الكمية">
             <LineChart data={chartData}>
               <XAxis
                 dataKey="date"
+                type="number"
+                domain={["dataMin", "dataMax"]}
                 tickFormatter={formatDate}
                 angle={-45}
                 textAnchor="end"
                 height={60}
-                interval="preserveStartEnd"
               />
               <YAxis />
               <Tooltip
-                labelFormatter={(label) =>
-                  new Date(label).toLocaleDateString("ar-DZ", {
-                    weekday: "long",
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })
+                labelFormatter={(value) =>
+                  new Date(value).toLocaleDateString("ar-DZ")
                 }
               />
               <Line
@@ -206,23 +226,15 @@ export default function StatisticsPage() {
             <LineChart data={chartData}>
               <XAxis
                 dataKey="date"
+                type="number"
+                domain={["dataMin", "dataMax"]}
                 tickFormatter={formatDate}
                 angle={-45}
                 textAnchor="end"
                 height={60}
-                interval="preserveStartEnd"
               />
               <YAxis />
-              <Tooltip
-                labelFormatter={(label) =>
-                  new Date(label).toLocaleDateString("ar-DZ", {
-                    weekday: "long",
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })
-                }
-              />
+              <Tooltip />
               <Line
                 dataKey="purchasePrice"
                 stroke="#10b981"
@@ -235,23 +247,15 @@ export default function StatisticsPage() {
             <LineChart data={chartData}>
               <XAxis
                 dataKey="date"
+                type="number"
+                domain={["dataMin", "dataMax"]}
                 tickFormatter={formatDate}
                 angle={-45}
                 textAnchor="end"
                 height={60}
-                interval="preserveStartEnd"
               />
               <YAxis />
-              <Tooltip
-                labelFormatter={(label) =>
-                  new Date(label).toLocaleDateString("ar-DZ", {
-                    weekday: "long",
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })
-                }
-              />
+              <Tooltip />
               <Line
                 dataKey="sellingPrice"
                 stroke="#f97316"
@@ -259,11 +263,12 @@ export default function StatisticsPage() {
               />
             </LineChart>
           </ChartCard>
+
         </div>
       )}
 
       {/* ================= Top Products ================= */}
-      <ChartCard title="المنتجات الأكثر شراءً (حسب الكمية)">
+      <ChartCard title="المنتجات الأكثر شراءً">
         <BarChart data={sortedTopProducts}>
           <XAxis dataKey="product_name" />
           <YAxis />
@@ -271,51 +276,12 @@ export default function StatisticsPage() {
           <Bar dataKey="total_quantity" fill="#6366f1" />
         </BarChart>
       </ChartCard>
-
-      {/* ================= Suppliers Debt ================= */}
-      <div className="bg-white p-6 rounded-xl shadow">
-        <h2 className="text-xl font-semibold mb-4">
-          الديون والمدفوعات للموردين
-        </h2>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-right border">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="p-3">المورد</th>
-                <th className="p-3">إجمالي الفواتير</th>
-                <th className="p-3">المدفوع</th>
-                <th className="p-3">المتبقي</th>
-              </tr>
-            </thead>
-            <tbody>
-              {suppliersDebt.map((s) => (
-                <tr
-                  key={s.supplier_id}
-                  className="hover:bg-gray-50"
-                >
-                  <td className="p-3">{s.supplier_name}</td>
-                  <td className="p-3">
-                    {s.total_invoices.toLocaleString()} دج
-                  </td>
-                  <td className="p-3 text-green-600">
-                    {s.paid.toLocaleString()} دج
-                  </td>
-                  <td className="p-3 text-red-600">
-                    {s.remaining.toLocaleString()} دج
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
     </div>
   );
 }
 
 /* =======================
-   Reusable Chart Card
+   Chart Card
 ======================= */
 function ChartCard({
   title,

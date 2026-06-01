@@ -7,9 +7,10 @@ interface Supplier {
   name: string;
   phone?: string;
   created_at: string;
-  totalDebt?: number;   // مجموع الفواتير
-  totalPaid?: number;   // مجموع المدفوع
-  remaining?: number;   // المتبقي
+
+  totalInvoices?: number;
+  totalPaid?: number;
+  remaining?: number;
 }
 
 export default function SuppliersPage() {
@@ -188,9 +189,9 @@ export default function SuppliersPage() {
               <th className="p-3">اسم المورد</th>
               <th className="p-3">رقم الهاتف</th>
               <th className="p-3">تاريخ الإضافة</th>
-              <th className="p-3">إجمالي الدين</th>
-              <th className="p-3">المدفوع</th>
-              <th className="p-3">المتبقي</th>
+              <th className="p-3">إجمالي الفواتير</th>
+<th className="p-3">المدفوع</th>
+<th className="p-3">باقي الدين</th>
               <th className="p-3">التحكم</th>
             </tr>
           </thead>
@@ -200,9 +201,23 @@ export default function SuppliersPage() {
                 <td className="p-3">{supplier.name}</td>
                 <td className="p-3">{supplier.phone || "-"}</td>
                 <td className="p-3">{new Date(supplier.created_at).toLocaleDateString()}</td>
-                <td className="p-3">{supplier.totalDebt ?? 0}</td>
-                <td className="p-3">{supplier.totalPaid ?? 0}</td>
-                <td className="p-3">{supplier.remaining ?? 0}</td>
+                <td className="p-3 font-semibold">
+  {supplier.totalInvoices ?? 0}
+</td>
+
+<td className="p-3 text-green-600 font-semibold">
+  {supplier.totalPaid ?? 0}
+</td>
+
+<td
+  className={`p-3 font-semibold ${
+    (supplier.remaining ?? 0) > 0
+      ? "text-red-600"
+      : "text-green-600"
+  }`}
+>
+  {supplier.remaining ?? 0}
+</td>
                 <td className="p-3 flex gap-2">
                   <button
                     onClick={() => {

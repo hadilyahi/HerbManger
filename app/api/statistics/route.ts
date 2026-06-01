@@ -4,18 +4,19 @@ import { pool } from "@/lib/db";
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const yearParam = searchParams.get("year");
+
+    const startDate = searchParams.get("startDate");
+    const endDate = searchParams.get("endDate");
     const productIdParam = searchParams.get("productId");
 
-    const year = yearParam ? Number(yearParam) : new Date().getFullYear();
     const productId = productIdParam ? Number(productIdParam) : undefined;
 
     // =======================
     // Validate inputs
     // =======================
-    if (isNaN(year)) {
+    if (!startDate || !endDate) {
       return NextResponse.json(
-        { message: "السنة غير صحيحة" },
+        { message: "يجب تحديد تاريخ البداية والنهاية" },
         { status: 400 }
       );
     }
@@ -28,20 +29,20 @@ export async function GET(req: Request) {
     }
 
     // =======================
-    // 1️⃣ إحصائيات المنتج (حسب تاريخ الفاتورة)
+    // 1️⃣ إحصائيات المنتج
     // =======================
     let productStatsQuery = `
       SELECT 
-        DATE(i.invoice_date) AS invoice_date,
-        SUM(ii.quantity) AS total_quantity,
-        AVG(ii.purchase_price) AS purchase_price,
-        AVG(ii.selling_price) AS selling_price
-      FROM invoice_items ii
-      JOIN invoices i ON ii.invoice_id = i.id
-      WHERE YEAR(i.invoice_date) = ?
+  DATE(i.invoice_date) AS invoice_date,
+  SUM(ii.quantity) AS total_quantity,
+  AVG(ii.purchase_price) AS purchase_price,
+  AVG(ii.selling_price) AS selling_price
+FROM invoice_items ii
+JOIN invoices i ON ii.invoice_id = i.id
+WHERE DATE(i.invoice_date) BETWEEN ? AND ?
     `;
 
-    const queryParams: number[] = [year];
+    const queryParams: (string | number)[] = [startDate, endDate];
 
     if (productId !== undefined) {
       productStatsQuery += ` AND ii.product_id = ?`;
@@ -49,8 +50,8 @@ export async function GET(req: Request) {
     }
 
     productStatsQuery += `
-      GROUP BY DATE(i.invoice_date)
-      ORDER BY DATE(i.invoice_date)
+      GROUP BY invoice_date
+ORDER BY invoice_date ASC
     `;
 
     const [productStatsRows] = await pool.query(
@@ -59,7 +60,7 @@ export async function GET(req: Request) {
     );
 
     // =======================
-    // 2️⃣ المنتجات الأكثر شراءً (حسب السنة)
+    // 2️⃣ المنتجات الأكثر شراءً
     // =======================
     const [topProductsRows] = await pool.query(
       `
@@ -71,12 +72,12 @@ export async function GET(req: Request) {
       FROM invoice_items ii
       JOIN invoices i ON ii.invoice_id = i.id
       JOIN products p ON ii.product_id = p.id
-      WHERE YEAR(i.invoice_date) = ?
+      WHERE DATE(i.invoice_date) BETWEEN ? AND ?
       GROUP BY p.id, p.name
       ORDER BY total_quantity DESC
       LIMIT 10
     `,
-      [year]
+      [startDate, endDate]
     );
 
     // =======================
@@ -92,15 +93,15 @@ export async function GET(req: Request) {
         SUM(i.remaining) AS remaining
       FROM invoices i
       JOIN suppliers s ON i.supplier_id = s.id
-      WHERE YEAR(i.invoice_date) = ?
+      WHERE DATE(i.invoice_date) BETWEEN ? AND ?
       GROUP BY s.id, s.name
       ORDER BY remaining DESC
     `,
-      [year]
+      [startDate, endDate]
     );
 
     // =======================
-    // 4️⃣ قائمة المنتجات (Dropdown)
+    // 4️⃣ قائمة المنتجات
     // =======================
     const [productsListRows] = await pool.query(`
       SELECT id, name FROM products ORDER BY name
