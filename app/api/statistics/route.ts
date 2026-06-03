@@ -32,14 +32,15 @@ export async function GET(req: Request) {
     // 1️⃣ إحصائيات المنتج
     // =======================
     let productStatsQuery = `
-      SELECT 
-  DATE(i.invoice_date) AS invoice_date,
-  SUM(ii.quantity) AS total_quantity,
-  AVG(ii.purchase_price) AS purchase_price,
-  AVG(ii.selling_price) AS selling_price
-FROM invoice_items ii
-JOIN invoices i ON ii.invoice_id = i.id
-WHERE DATE(i.invoice_date) BETWEEN ? AND ?
+      SELECT
+        ii.id,
+        i.invoice_date,
+        ii.quantity AS total_quantity,
+        ii.purchase_price,
+        ii.selling_price
+      FROM invoice_items ii
+      JOIN invoices i ON ii.invoice_id = i.id
+      WHERE DATE(i.invoice_date) BETWEEN ? AND ?
     `;
 
     const queryParams: (string | number)[] = [startDate, endDate];
@@ -50,8 +51,7 @@ WHERE DATE(i.invoice_date) BETWEEN ? AND ?
     }
 
     productStatsQuery += `
-      GROUP BY invoice_date
-ORDER BY invoice_date ASC
+      ORDER BY i.invoice_date ASC, ii.id ASC
     `;
 
     const [productStatsRows] = await pool.query(
@@ -64,7 +64,7 @@ ORDER BY invoice_date ASC
     // =======================
     const [topProductsRows] = await pool.query(
       `
-      SELECT 
+      SELECT
         p.id AS product_id,
         p.name AS product_name,
         SUM(ii.quantity) AS total_quantity,
@@ -76,16 +76,16 @@ ORDER BY invoice_date ASC
       GROUP BY p.id, p.name
       ORDER BY total_quantity DESC
       LIMIT 10
-    `,
+      `,
       [startDate, endDate]
     );
 
     // =======================
-    // 3️⃣ الديون والمدفوعات للموردين
+    // 3️⃣ ديون الموردين
     // =======================
     const [suppliersDebtRows] = await pool.query(
       `
-      SELECT 
+      SELECT
         s.id AS supplier_id,
         s.name AS supplier_name,
         SUM(i.total_amount) AS total_invoices,
@@ -96,7 +96,7 @@ ORDER BY invoice_date ASC
       WHERE DATE(i.invoice_date) BETWEEN ? AND ?
       GROUP BY s.id, s.name
       ORDER BY remaining DESC
-    `,
+      `,
       [startDate, endDate]
     );
 
@@ -104,7 +104,9 @@ ORDER BY invoice_date ASC
     // 4️⃣ قائمة المنتجات
     // =======================
     const [productsListRows] = await pool.query(`
-      SELECT id, name FROM products ORDER BY name
+      SELECT id, name
+      FROM products
+      ORDER BY name
     `);
 
     // =======================
@@ -118,9 +120,14 @@ ORDER BY invoice_date ASC
     });
   } catch (err) {
     console.error(err);
+
     return NextResponse.json(
-      { message: "حدث خطأ أثناء استخراج الإحصائيات" },
-      { status: 500 }
+      {
+        message: "حدث خطأ أثناء استخراج الإحصائيات",
+      },
+      {
+        status: 500,
+      }
     );
   }
 }

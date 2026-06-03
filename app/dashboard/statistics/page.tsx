@@ -16,6 +16,7 @@ import {
    Interfaces
 ======================= */
 interface ProductStat {
+  id: number;
   invoice_date: string;
   total_quantity: number;
   purchase_price: number;
@@ -93,28 +94,32 @@ export default function StatisticsPage() {
      🔥 FIX: chart data (timestamp)
   ======================= */
   const chartData = useMemo(
-    () =>
-      productStats
-        .map((p) => ({
-          date: new Date(p.invoice_date).getTime(), // مهم جدًا
-          label: p.invoice_date,
-          quantity: p.total_quantity,
-          purchasePrice: p.purchase_price,
-          sellingPrice: p.selling_price,
-        }))
-        .sort((a, b) => a.date - b.date), // مهم للترتيب بين السنوات
-    [productStats]
-  );
+  () =>
+    productStats
+      .map((p) => ({
+        id: p.id,
+        date: new Date(p.invoice_date).getTime(),
+        label: p.invoice_date,
+        quantity: p.total_quantity,
+        purchasePrice: Number(p.purchase_price),
+        sellingPrice: Number(p.selling_price),
 
+        // مفتاح فريد لكل عملية
+        xValue: new Date(p.invoice_date).getTime() + p.id,
+      }))
+      .sort((a, b) => a.xValue - b.xValue),
+  [productStats]
+);
   /* =======================
      Date formatter
   ======================= */
-  const formatDate = (value: number) => {
-    return new Date(value).toLocaleDateString("ar-DZ", {
-      day: "2-digit",
-      month: "short",
-    });
-  };
+ const formatDate = (value: number) => {
+  return new Date(value).toLocaleDateString("ar-DZ", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+};
 
   /* =======================
      Search products
@@ -209,11 +214,15 @@ export default function StatisticsPage() {
                 height={60}
               />
               <YAxis />
-              <Tooltip
-                labelFormatter={(value) =>
-                  new Date(value).toLocaleDateString("ar-DZ")
-                }
-              />
+            <Tooltip
+  labelFormatter={(value) =>
+    new Date(Number(value)).toLocaleDateString("ar-DZ", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    })
+  }
+/>
               <Line
                 dataKey="quantity"
                 stroke="#6366f1"
@@ -225,21 +234,39 @@ export default function StatisticsPage() {
           <ChartCard title="تطور سعر الشراء">
             <LineChart data={chartData}>
               <XAxis
-                dataKey="date"
-                type="number"
-                domain={["dataMin", "dataMax"]}
-                tickFormatter={formatDate}
-                angle={-45}
-                textAnchor="end"
-                height={60}
+                  dataKey="xValue"
+                  type="number"
+                  domain={["dataMin", "dataMax"]}
+                  tickFormatter={(_, index) =>
+  chartData[index]
+    ? new Date(chartData[index].date).toLocaleDateString("ar-DZ", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+    : ""
+}
+                  angle={-45}
+                  textAnchor="end"
+                  height={60}
               />
               <YAxis />
-              <Tooltip />
+              <Tooltip
+  labelFormatter={(value) =>
+    new Date(Number(value)).toLocaleDateString("ar-DZ", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    })
+  }
+/>
               <Line
-                dataKey="purchasePrice"
-                stroke="#10b981"
-                strokeWidth={3}
-              />
+  dataKey="purchasePrice"
+  stroke="#10b981"
+  strokeWidth={3}
+  dot={{ r: 5 }}
+  activeDot={{ r: 8 }}
+/>
             </LineChart>
           </ChartCard>
 
