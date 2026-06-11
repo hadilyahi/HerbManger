@@ -19,23 +19,34 @@ export async function createInvoice(
     let totalAmount = 0;
 
     for (const item of data.items) {
-      const totalCost = item.quantity * item.purchasePrice;
-      totalAmount += totalCost;
+  const totalCost = item.quantity * item.purchasePrice;
+  totalAmount += totalCost;
 
-      await connection.query<ResultSetHeader>(
-        `INSERT INTO invoice_items
-         (invoice_id, product_id, quantity, purchase_price, selling_price, total_cost)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [
-          invoiceId,
-          item.productId,
-          item.quantity,
-          item.purchasePrice,
-          item.sellingPrice,
-          totalCost,
-        ],
-      );
-    }
+  await connection.query<ResultSetHeader>(
+    `INSERT INTO invoice_items
+     (invoice_id, product_id, quantity, purchase_price, selling_price, total_cost)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [
+      invoiceId,
+      item.productId,
+      item.quantity,
+      item.purchasePrice,
+      item.sellingPrice,
+      totalCost,
+    ],
+  );
+
+  // إضافة الكمية للمخزون
+  await connection.query(
+    `
+    INSERT INTO warehouse_stock (product_id, quantity)
+    VALUES (?, ?)
+    ON DUPLICATE KEY UPDATE
+    quantity = quantity + VALUES(quantity)
+    `,
+    [item.productId, item.quantity]
+  );
+}
 
     const remaining = totalAmount - data.paidAmount;
 

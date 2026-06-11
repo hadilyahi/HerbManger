@@ -391,7 +391,6 @@ async function handleDeleteStock() {
 </tbody>
 
         </table>
-
       </div>
     <Dialog open={editOpen} onOpenChange={setEditOpen}>
   <DialogContent className="sm:max-w-md">

@@ -19,7 +19,7 @@ export default function Layout({ children }: LayoutProps) {
       {/* Sidebar */}
       <aside className="w-64 bg-green-200 p-6 flex flex-col justify-between text-black">
         <div className="space-y-6">
-          <div className="flex items-start mb-24 justify-end gap-2 text-right">
+          <div className="flex items-start mb-12 justify-end gap-2 text-right">
             <span className="text-2xl font-extrabold">عشاب السلطان</span>
             <Image src="/assets/user.svg" alt="User Icon" width={30} height={30} />
           </div>
