@@ -6,33 +6,22 @@ import { updateStock, deleteStock } from "@/lib/services/stock.service";
 // =====================
 export async function PUT(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
+
     const body = await request.json();
 
-    const productId = Number(context.params.id);
+    const productId = Number(id);
     const quantity = Number(body.quantity);
-
-    if (!productId) {
-      return NextResponse.json(
-        { message: "Invalid product id" },
-        { status: 400 }
-      );
-    }
-
-    if (Number.isNaN(quantity) || quantity < 0) {
-      return NextResponse.json(
-        { message: "Invalid quantity" },
-        { status: 400 }
-      );
-    }
 
     await updateStock(productId, quantity);
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error(error);
+
     return NextResponse.json(
       { message: "Failed to update stock" },
       { status: 500 }
@@ -40,28 +29,21 @@ export async function PUT(
   }
 }
 
-// =====================
-// DELETE STOCK
-// =====================
 export async function DELETE(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const productId = Number(context.params.id);
+    const { id } = await params;
 
-    if (!productId) {
-      return NextResponse.json(
-        { message: "Invalid product id" },
-        { status: 400 }
-      );
-    }
+    const productId = Number(id);
 
     await deleteStock(productId);
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error(error);
+
     return NextResponse.json(
       { message: "Failed to delete stock" },
       { status: 500 }

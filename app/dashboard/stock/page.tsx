@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Package, AlertTriangle, Plus, Search } from "lucide-react";
+import {
+  Package,
+  AlertTriangle,
+  Plus,
+  Search,
+  
+} from "lucide-react";
 
 import {
   Dialog,
@@ -42,7 +48,14 @@ export default function StockPage() {
   const [items, setItems] = useState<
     { productId: string; quantity: number }[]
   >([]);
+  const [editOpen, setEditOpen] = useState(false);
 
+const [selectedItem, setSelectedItem] =
+  useState<StockItem | null>(null);
+
+const [editQuantity, setEditQuantity] = useState(0);
+const [deleteOpen, setDeleteOpen] = useState(false);
+const [selectedDeleteId, setSelectedDeleteId] = useState<number | null>(null);
   // =====================
   // FETCH DATA
   // =====================
@@ -106,6 +119,47 @@ export default function StockPage() {
     setItems([]);
     fetchStock();
   }
+    function openEdit(item: StockItem) {
+  setSelectedItem(item);
+  setEditQuantity(item.quantity);
+  setEditOpen(true);
+}
+
+async function handleUpdateStock() {
+  if (!selectedItem) return;
+
+  await fetch(`/api/stock/${selectedItem.product_id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      quantity: editQuantity,
+    }),
+  });
+
+  setEditOpen(false);
+  fetchStock();
+  
+}
+
+function openDeleteDialog(productId: number) {
+  setSelectedDeleteId(productId);
+  setDeleteOpen(true);
+}
+
+async function handleDeleteStock() {
+  if (!selectedDeleteId) return;
+
+  await fetch(`/api/stock/${selectedDeleteId}`, {
+    method: "DELETE",
+  });
+
+  setDeleteOpen(false);
+  setSelectedDeleteId(null);
+
+  fetchStock();
+}
 
   // =====================
   // STATS
@@ -274,44 +328,164 @@ export default function StockPage() {
         <table className="w-full">
 
           <thead className="bg-green-50">
-            <tr>
-              <th className="text-right p-4">المنتج</th>
-              <th className="text-right p-4">الكمية</th>
-              <th className="text-right p-4">الحالة</th>
-            </tr>
-          </thead>
+  <tr>
+    <th className="text-right p-4">المنتج</th>
+    <th className="text-right p-4">الكمية</th>
+    <th className="text-right p-4">الحالة</th>
+    <th className="text-right p-4">العمليات</th>
+  </tr>
+</thead>
 
-          <tbody>
-            {stock.map((item) => (
-              <tr key={item.product_id} className="border-t hover:bg-gray-50">
+         <tbody>
+  {stock.map((item) => (
+    <tr
+      key={item.product_id}
+      className="border-t hover:bg-gray-50"
+    >
+      <td className="p-4 font-medium">
+        {item.product_name}
+      </td>
 
-                <td className="p-4 font-medium">{item.product_name}</td>
-                <td className="p-4">{item.quantity}</td>
+      <td className="p-4">
+        {item.quantity}
+      </td>
 
-                <td className="p-4">
-                  {item.quantity === 0 ? (
-                    <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm">
-                      نافد
-                    </span>
-                  ) : item.quantity < 10 ? (
-                    <span className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-sm">
-                      منخفض
-                    </span>
-                  ) : (
-                    <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm">
-                      متوفر
-                    </span>
-                  )}
-                </td>
+      <td className="p-4">
+        {item.quantity === 0 ? (
+          <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm">
+            نافد
+          </span>
+        ) : item.quantity < 10 ? (
+          <span className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-sm">
+            منخفض
+          </span>
+        ) : (
+          <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm">
+            متوفر
+          </span>
+        )}
+      </td>
 
-              </tr>
-            ))}
-          </tbody>
+      {/* العمليات */}
+      <td className="p-4">
+        <div className="flex gap-2">
+
+          <button
+            onClick={() => openEdit(item)}
+            className=" text-blue-600 px-3 py-2 rounded-lg hover:bg-blue-200"
+          >
+            ✏️
+          </button>
+
+          <button
+            onClick={() => openDeleteDialog(item.product_id)}
+            className=" text-red-600 px-3 py-2 rounded-lg hover:bg-red-200"
+          >
+            🗑️
+          </button>
+
+        </div>
+      </td>
+    </tr>
+  ))}
+</tbody>
 
         </table>
 
       </div>
+    <Dialog open={editOpen} onOpenChange={setEditOpen}>
+  <DialogContent className="sm:max-w-md">
 
+    <DialogHeader>
+      <DialogTitle className="text-right">
+        تعديل المخزون
+      </DialogTitle>
+    </DialogHeader>
+
+    <div className="space-y-4">
+
+      <div>
+        <Label>المنتج</Label>
+
+        <Input
+          value={selectedItem?.product_name || ""}
+          disabled
+        />
+      </div>
+
+      <div>
+        <Label>الكمية الجديدة</Label>
+
+        <Input
+          type="number"
+          min={0}
+          value={editQuantity}
+          onChange={(e) =>
+            setEditQuantity(Number(e.target.value))
+          }
+        />
+      </div>
+
+      <div className="flex justify-end gap-3">
+
+        <button
+          type="button"
+          onClick={() => setEditOpen(false)}
+          className="border px-4 py-2 rounded-xl"
+        >
+          إلغاء
+        </button>
+
+        <button
+          type="button"
+          onClick={handleUpdateStock}
+          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl"
+        >
+          حفظ التعديل
+        </button>
+
+      </div>
+
+    </div>
+
+  </DialogContent>
+</Dialog>
+<Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+  <DialogContent className="sm:max-w-md">
+
+    <DialogHeader>
+      <DialogTitle className="text-right text-red-600">
+        تأكيد الحذف
+      </DialogTitle>
+    </DialogHeader>
+
+    <p className="text-gray-600 text-right">
+      هل أنت متأكد من حذف هذا المنتج من المخزون؟
+      لا يمكن التراجع عن هذا الإجراء.
+    </p>
+
+    <div className="flex justify-end gap-3 mt-4">
+
+      <button
+        type="button"
+        onClick={() => setDeleteOpen(false)}
+        className="border px-4 py-2 rounded-xl"
+      >
+        إلغاء
+      </button>
+
+      <button
+        type="button"
+        onClick={handleDeleteStock}
+        className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl"
+      >
+        حذف
+      </button>
+
+    </div>
+
+  </DialogContent>
+</Dialog>
     </div>
   );
 }
