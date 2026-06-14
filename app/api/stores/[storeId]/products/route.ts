@@ -6,11 +6,11 @@ export async function POST(
   {
     params,
   }: {
-    params: Promise<{ id: string }>;
+    params: Promise<{ storeId:  string }>;
   }
 ) {
   try {
-    const { id } = await params;
+    const { storeId } = await params;
 
     const body = await request.json();
 
@@ -21,6 +21,7 @@ export async function POST(
       sellingPrice,
     } = body;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const existing = await query<any[]>(
 `
 SELECT store_id
@@ -29,7 +30,7 @@ WHERE store_id = ?
 AND product_id = ?
 LIMIT 1
 `,
-[id, productId]
+[storeId, productId]
 );
 
     if (existing.length > 0) {
@@ -47,7 +48,7 @@ LIMIT 1
           quantity,
           purchasePrice,
           sellingPrice,
-          id,
+          storeId,
           productId,
         ]
       );
@@ -68,7 +69,7 @@ LIMIT 1
           )
         `,
         [
-          id,
+          storeId,
           productId,
           quantity,
           purchasePrice,
