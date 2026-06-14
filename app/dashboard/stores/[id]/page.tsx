@@ -11,14 +11,19 @@ import {
   ArrowRightLeft,
 } from "lucide-react";
 import { AddStoreProductDialog } from "@/app/Components/popup/add-store-product-dialog";
-
+import { EditStoreProductDialog } from "@/app/Components/popup/edit-store-product-dialog";
+export const dynamic = "force-dynamic";
 export default async function StorePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
-}) {
+  searchParams: Promise<{ search?: string }>;
+}) {            
   const { id } = await params;
-
+  
+const { search = "" } = await searchParams;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const stores = await query<any[]>(
     `
       SELECT *
@@ -30,27 +35,24 @@ export default async function StorePage({
 
   const store = stores[0];
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const products = await query<any[]>(
-    `
-      SELECT
-        p.id,
-        p.name,
-
-        ss.quantity,
-        ss.purchase_price,
-        ss.selling_price
-
-      FROM store_stock ss
-
-      INNER JOIN products p
+  `
+    SELECT
+      p.id,
+      p.name,
+      ss.quantity,
+      ss.purchase_price,
+      ss.selling_price
+    FROM store_stock ss
+    INNER JOIN products p
       ON p.id = ss.product_id
-
-      WHERE ss.store_id = ?
-
-      ORDER BY p.name
-    `,
-    [id]
-  );
+    WHERE ss.store_id = ?
+      AND p.name LIKE ?
+    ORDER BY p.name
+  `,
+  [id, `%${search}%`]
+);
 
   const totalCost = products.reduce(
     (sum, p) =>
@@ -88,6 +90,7 @@ export default async function StorePage({
 
         <Card>
           <CardContent className="p-4">
+            
             <p className="text-gray-500">
               تكلفة المخزون
             </p>
@@ -140,101 +143,115 @@ export default async function StorePage({
       <Card>
 
         <CardContent className="p-0 overflow-x-auto">
+         <form method="GET" className="mb-4 flex gap-2">
+  <input
+    type="text"
+    name="search"
+    defaultValue={search}
+    placeholder="ابحث عن منتج..."
+    className="flex-1 border rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-green-600"
+  />
 
+  <Button type="submit">
+    بحث
+  </Button>
+</form>
           <table className="w-full">
+  <thead className="bg-green-700 text-white">
+    <tr>
+      <th className="p-3 text-right">
+        المنتج
+      </th>
 
-            <thead className="bg-green-700 text-white">
+      <th className="p-3">
+        الكمية
+      </th>
 
-              <tr>
+      <th className="p-3">
+        شراء
+      </th>
 
-                <th className="p-3 text-right">
-                  المنتج
-                </th>
+      <th className="p-3">
+        بيع
+      </th>
 
-                <th className="p-3">
-                  الكمية
-                </th>
+      <th className="p-3">
+        التكلفة
+      </th>
 
-                <th className="p-3">
-                  شراء
-                </th>
+      <th className="p-3">
+        قيمة البيع
+      </th>
 
-                <th className="p-3">
-                  بيع
-                </th>
+      <th className="p-3">
+        الربح
+      </th>
 
-                <th className="p-3">
-                  التكلفة
-                </th>
+      <th className="p-3">
+        الإجراءات
+      </th>
+    </tr>
+  </thead>
 
-                <th className="p-3">
-                  قيمة البيع
-                </th>
+  <tbody>
+    {products.map((product) => {
+      const cost =
+        Number(product.quantity) *
+        Number(product.purchase_price);
 
-                <th className="p-3">
-                  الربح
-                </th>
+      const sales =
+        Number(product.quantity) *
+        Number(product.selling_price);
 
-              </tr>
+      const profit = sales - cost;
 
-            </thead>
+      return (
+        <tr
+          key={product.id}
+          className="border-b"
+        >
+          <td className="p-3">
+            {product.name}
+          </td>
 
-            <tbody>
+          <td className="p-3 text-center">
+            {product.quantity}
+          </td>
 
-              {products.map((product) => {
+          <td className="p-3 text-center">
+            {product.purchase_price}
+          </td>
 
-                const cost =
-                  Number(product.quantity) *
-                  Number(product.purchase_price);
+          <td className="p-3 text-center">
+            {product.selling_price}
+          </td>
 
-                const sales =
-                  Number(product.quantity) *
-                  Number(product.selling_price);
+          <td className="p-3 text-center">
+            {cost.toLocaleString()}
+          </td>
 
-                const profit =
-                  sales - cost;
+          <td className="p-3 text-center">
+            {sales.toLocaleString()}
+          </td>
 
-                return (
-                  <tr
-                    key={product.id}
-                    className="border-b"
-                  >
+          <td className="p-3 text-center font-bold text-green-700">
+            {profit.toLocaleString()}
+          </td>
 
-                    <td className="p-3">
-                      {product.name}
-                    </td>
-
-                    <td className="p-3 text-center">
-                      {product.quantity}
-                    </td>
-
-                    <td className="p-3 text-center">
-                      {product.purchase_price}
-                    </td>
-
-                    <td className="p-3 text-center">
-                      {product.selling_price}
-                    </td>
-
-                    <td className="p-3 text-center">
-                      {cost.toLocaleString()}
-                    </td>
-
-                    <td className="p-3 text-center">
-                      {sales.toLocaleString()}
-                    </td>
-
-                    <td className="p-3 text-center font-bold text-green-700">
-                      {profit.toLocaleString()}
-                    </td>
-
-                  </tr>
-                );
-              })}
-
-            </tbody>
-
-          </table>
+          <td className="p-3 text-center">
+            <EditStoreProductDialog
+              storeId={Number(id)}
+              productId={product.id}
+              quantity={Number(product.quantity)}
+              purchasePrice={Number(product.purchase_price)}
+              sellingPrice={Number(product.selling_price)}
+            />
+          </td>
+        </tr>
+      );
+    })}
+  </tbody>
+</table>
 
         </CardContent>
 
