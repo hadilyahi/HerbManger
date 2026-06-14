@@ -49,6 +49,10 @@ export default function Layout({ children }: LayoutProps) {
               <span>المخزون</span>
               <Image src="/assets/statistique.svg" alt="Suppliers Icon" width={25} height={25} />
             </Link>
+            <Link href="/dashboard/stores" className="hover:bg-green-300 p-2 rounded flex items-center gap-2 justify-end">
+              <span>المحلات</span>
+              <Image src="/assets/statistique.svg" alt="Suppliers Icon" width={25} height={25} />
+            </Link>
             <Link href="/dashboard/archive" className="hover:bg-green-300 p-2 rounded flex items-center gap-2 justify-end">
               <span>الأرشيف</span>
                 <Image src="/assets/archive.svg" alt="Archive Icon" width={25} height={25} />
