@@ -96,7 +96,7 @@ const { search = "" } = await searchParams;
             </p>
 
             <h2 className="text-2xl font-bold">
-              {totalCost.toLocaleString()} دج
+              {totalCost.toFixed(2)} دج
             </h2>
           </CardContent>
         </Card>
@@ -108,7 +108,7 @@ const { search = "" } = await searchParams;
             </p>
 
             <h2 className="text-2xl font-bold">
-              {totalSales.toLocaleString()} دج
+              {totalSales.toFixed(2)} دج
             </h2>
           </CardContent>
         </Card>
@@ -120,7 +120,7 @@ const { search = "" } = await searchParams;
             </p>
 
             <h2 className="text-2xl font-bold text-green-700">
-              {totalProfit.toLocaleString()} دج
+              {totalProfit.toFixed(2)} دج
             </h2>
           </CardContent>
         </Card>
@@ -227,15 +227,15 @@ const { search = "" } = await searchParams;
           </td>
 
           <td className="p-3 text-center">
-            {cost.toLocaleString()}
+            {cost.toFixed(2)}
           </td>
 
           <td className="p-3 text-center">
-            {sales.toLocaleString()}
+            {sales.toFixed(2)}
           </td>
 
           <td className="p-3 text-center font-bold text-green-700">
-            {profit.toLocaleString()}
+            {profit.toFixed(2)}
           </td>
 
           <td className="p-3 text-center">
