@@ -154,38 +154,25 @@ for(const item of data.items){
 
 
 await connection.execute(
-
-`
-
-INSERT INTO warehouse_purchase_invoice_items
-
-(
-invoice_id,
-product_id,
-quantity,
-purchase_price
-)
-
-VALUES (?,?,?,?)
-
-`
-
-,
-
-[
-
-invoiceId,
-
-item.productId,
-
-item.quantity,
-
-item.purchasePrice
-
-]
-
+  `
+  INSERT INTO warehouse_purchase_invoice_items
+  (
+    invoice_id,
+    product_id,
+    quantity,
+    remaining_quantity,
+    purchase_price
+  )
+  VALUES (?,?,?,?,?)
+  `,
+  [
+    invoiceId,
+    item.productId,
+    item.quantity,
+    item.quantity,
+    item.purchasePrice,
+  ]
 );
-
 
 
 

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { RowDataPacket } from "mysql2";
-import { ResultSetHeader } from "mysql2";
+
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -35,18 +35,33 @@ export async function GET(
     );
   }
 
-  // منتجات الفاتورة
+  // منتجات الفاتورة مع الكمية المتبقية
   const [items] = await pool.execute<RowDataPacket[]>(
     `
     SELECT
-      ii.id,
-      ii.product_id,
-      p.name,
-      ii.quantity,
-      ii.purchase_price
+        ii.id,
+        ii.product_id,
+        p.name,
+        ii.quantity,
+        ii.purchase_price,
+
+        (
+            ii.quantity -
+            IFNULL(
+                (
+                    SELECT SUM(s.quantity)
+                    FROM warehouse_invoice_sales s
+                    WHERE s.invoice_item_id = ii.id
+                ),
+                0
+            )
+        ) AS remaining
+
     FROM warehouse_purchase_invoice_items ii
+
     INNER JOIN products p
-      ON p.id = ii.product_id
+        ON p.id = ii.product_id
+
     WHERE ii.invoice_id = ?
     `,
     [id]
@@ -57,7 +72,6 @@ export async function GET(
     items,
   });
 }
-
 
 export async function PUT(
   req: Request,
@@ -139,22 +153,28 @@ export async function PUT(
       ]
     );
 
-    // إضافة العناصر الجديدة للمخزون
+    // إضافة العناصر الجديدة
     for (const item of body.items) {
-
       await conn.execute(
-        `
-        INSERT INTO warehouse_purchase_invoice_items
-        (invoice_id, product_id, quantity, purchase_price)
-        VALUES (?,?,?,?)
-        `,
-        [
-          id,
-          item.productId,
-          item.quantity,
-          item.purchasePrice,
-        ]
-      );
+  `
+  INSERT INTO warehouse_purchase_invoice_items
+  (
+    invoice_id,
+    product_id,
+    quantity,
+    remaining_quantity,
+    purchase_price
+  )
+  VALUES (?,?,?,?,?)
+  `,
+  [
+    id,
+    item.productId,
+    item.quantity,
+    item.quantity, // في البداية المتبقي يساوي الكمية
+    item.purchasePrice,
+  ]
+);
 
       await conn.execute(
         `
@@ -199,6 +219,7 @@ export async function PUT(
 
   }
 }
+
 export async function DELETE(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -235,9 +256,7 @@ export async function DELETE(
       [id]
     );
 
-    // طرح الكميات
     for (const item of items) {
-
       await conn.execute(
         `
         UPDATE warehouse_stock
@@ -251,7 +270,6 @@ export async function DELETE(
           item.product_id,
         ]
       );
-
     }
 
     await conn.execute(

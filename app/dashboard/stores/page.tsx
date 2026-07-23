@@ -1,122 +1,118 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import AddStoreModal from "@/app/Components/Stores/AddStoreModal";
 
-import { query } from "@/lib/db";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { AddStoreDialog } from "@/app/Components/popup/add-store-dialog";
-type Store = {
+interface Store {
   id: number;
   name: string;
-  products: number;
-  stockValue: number;
-  profit: number;
-};
+  phone: string;
+  address: string;
+  previous_balance: number;
+  current_balance: number;
+  notes: string;
+}
 
-export default async function StoresPage() {
-  const stores = await query<Store[]>(`
-    SELECT
-      s.id,
-      s.name,
+export default function StoresPage() {
+  const [stores, setStores] = useState<Store[]>([]);
+  const [open, setOpen] = useState(false);
 
-      COUNT(ss.product_id) AS products,
+  async function loadStores() {
+    const res = await fetch("/api/stores");
+    const data = await res.json();
+    setStores(data);
+  }
 
-      COALESCE(
-        SUM(ss.quantity * ss.purchase_price),
-        0
-      ) AS stockValue,
-
-      COALESCE(
-        SUM(
-          ss.quantity *
-          (ss.selling_price - ss.purchase_price)
-        ),
-        0
-      ) AS profit
-
-    FROM stores s
-
-    LEFT JOIN store_stock ss
-      ON ss.store_id = s.id
-
-    GROUP BY s.id, s.name
-
-    ORDER BY s.name
-  `);
+  useEffect(() => {
+    loadStores();
+  }, []);
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-6">
 
-        <div>
-          <h1 className="text-3xl font-bold">
-            إدارة المحلات
-          </h1>
+      <div className="flex justify-between items-center mb-6">
 
-          <p className="text-muted-foreground">
-            إدارة مخزون المحلات والأرباح
-          </p>
-        </div>
+        <h1 className="text-3xl font-bold">
+          المحلات
+        </h1>
 
-        <AddStoreDialog />
+        <button
+          onClick={() => setOpen(true)}
+          className="bg-green-600 text-white px-5 py-2 rounded-lg"
+        >
+          + إضافة محل
+        </button>
+
+      </div>
+
+      <div className="overflow-auto bg-white rounded-xl shadow">
+
+        <table className="w-full">
+
+          <thead className="bg-gray-100">
+
+            <tr>
+
+              <th className="p-3">الاسم</th>
+
+              <th className="p-3">الهاتف</th>
+
+              <th className="p-3">الرصيد</th>
+
+              <th className="p-3">العملية</th>
+
+            </tr>
+
+          </thead>
+
+          <tbody>
+
+            {stores.map((store) => (
+
+              <tr
+                key={store.id}
+                className="border-b"
+              >
+
+                <td className="p-3">{store.name}</td>
+
+                <td className="p-3">{store.phone}</td>
+
+                <td className="p-3">
+                  {store.current_balance} دج
+                </td>
+
+                <td className="p-3">
+
+                  <Link
+                    href={`/dashboard/stores/${store.id}`}
+                    className="text-blue-600"
+                  >
+                    فتح
+                  </Link>
+
+                </td>
+
+              </tr>
+
+            ))}
+
+          </tbody>
+
+        </table>
 
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <AddStoreModal
+        open={open}
+        onClose={() => {
+          setOpen(false);
+          loadStores();
+        }}
+      />
 
-        {stores.map((store) => (
-          <Link
-            key={store.id}
-            href={`/dashboard/stores/${store.id}`}
-          >
-            <Card className="cursor-pointer transition hover:shadow-lg">
-
-              <CardContent className="p-5">
-
-                <h2 className="mb-4 text-xl font-bold">
-                  {store.name}
-                </h2>
-
-                <div className="space-y-2 text-sm">
-
-                  <div className="flex justify-between">
-                    <span>عدد المنتجات</span>
-
-                    <span className="font-bold">
-                      {store.products}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between">
-                    <span>قيمة المخزون</span>
-
-                    <span className="font-bold">
-                      {Number(
-                        store.stockValue
-                      ).toLocaleString()} دج
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between text-green-700 font-bold">
-                    <span>الربح المتوقع</span>
-
-                    <span>
-                      {Number(
-                        store.profit
-                      ).toLocaleString()} دج
-                    </span>
-                  </div>
-
-                </div>
-
-              </CardContent>
-
-            </Card>
-          </Link>
-        ))}
-
-      </div>
     </div>
   );
 }

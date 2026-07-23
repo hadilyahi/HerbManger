@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import AddWarehouseInvoiceModal from "@/app/Components/Warehouses/AddWarehouseInvoiceModal";
 import ProductHistoryModal from "@/app/Components/Warehouses/ProductHistoryModal";
-
+import AddPaymentModal from "@/app/Components/Warehouses/AddPaymentModal";
 interface Warehouse {
   id: number;
   name: string;
@@ -37,6 +37,12 @@ interface ProductHistory {
   quantity: number;
   purchase_price: number;
 }
+interface Payment {
+  id: number;
+  amount: number;
+  payment_date: string;
+  notes: string;
+}
 
 export default function WarehousePage({
   params,
@@ -47,6 +53,7 @@ export default function WarehousePage({
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [products, setProducts] = useState<WarehouseProduct[]>([]);
   const [history, setHistory] = useState<ProductHistory[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
 const [selectedProduct, setSelectedProduct] =
   useState<WarehouseProduct | null>(null);
 
@@ -56,7 +63,9 @@ const [openHistory, setOpenHistory] = useState(false);
   // يجب أن يكون هنا وليس داخل useEffect
   const [openInvoiceModal, setOpenInvoiceModal] = useState(false);
   const [editingInvoiceId, setEditingInvoiceId] = useState<number | null>(null);
-  
+  const [openPaymentModal, setOpenPaymentModal] = useState(false);
+  const [openPreviousDebt, setOpenPreviousDebt] = useState(false);
+const [previousDebt, setPreviousDebt] = useState("");
   async function loadInvoices(id: string) {
   const res = await fetch(`/api/warehouses/${id}/invoices`);
   const data = await res.json();
@@ -80,6 +89,17 @@ async function loadHistory(productId: number) {
 
   setHistory(data);
 }
+async function loadPayments(id:string){
+
+  const res = await fetch(
+    `/api/warehouses/${id}/payments`
+  );
+
+  const data = await res.json();
+
+  setPayments(data);
+
+}
   useEffect(() => {
     async function load() {
       const { id } = await params;
@@ -90,6 +110,7 @@ async function loadHistory(productId: number) {
       setWarehouse(data);
       await loadInvoices(id);
       await loadProducts(id);
+      await loadPayments(id);
     }
 
     load();
@@ -112,6 +133,24 @@ const stockValue = products.reduce(
 );
 
 const totalInvoices = invoices.length;
+const totalInvoiceDebt = invoices.reduce(
+  (sum, invoice) => sum + Number(invoice.remaining),
+  0
+);
+
+const totalPayments = payments.reduce(
+  (sum, payment) =>
+    sum + Number(payment.amount),
+  0
+);
+
+
+const currentDebt =
+  Number(warehouse.previous_balance)
+  +
+  totalInvoiceDebt
+  -
+  totalPayments;
 async function deleteInvoice(id: number) {
 
   if (!confirm("هل تريد حذف الفاتورة؟"))
@@ -173,15 +212,42 @@ async function deleteInvoice(id: number) {
       الرصيد السابق
     </p>
 
-    <h2 className="mt-3 text-4xl font-bold text-green-700">
-      {Number(warehouse.previous_balance).toFixed(2)}
-    </h2>
+    <button
+onClick={()=>{
+
+setPreviousDebt(
+String(warehouse.previous_balance)
+);
+
+setOpenPreviousDebt(true);
+
+}}
+className="mt-3 text-4xl font-bold text-green-700"
+>
+
+{Number(warehouse.previous_balance).toFixed(2)}
+
+</button>
 
     <p className="text-xs text-gray-400 mt-2">
       دج
     </p>
   </div>
+  <div className="bg-white rounded-2xl border shadow-sm p-6 hover:shadow-lg transition">
 
+  <p className="text-sm text-gray-500">
+    الدين الحالي
+  </p>
+
+  <h2 className="mt-3 text-4xl font-bold text-red-600">
+    {currentDebt.toFixed(2)}
+  </h2>
+
+  <p className="text-xs text-gray-400 mt-2">
+    دج
+  </p>
+
+</div>
   {/* عدد المنتجات */}
   <div className="bg-white rounded-2xl border shadow-sm p-6 hover:shadow-lg transition">
     <p className="text-sm text-gray-500">
@@ -426,11 +492,108 @@ async function deleteInvoice(id: number) {
   </table>
 )}
 
-          {activeTab === "payments" && (
-            <div className="text-center py-10 text-gray-500">
-              لا توجد مدفوعات
-            </div>
-          )}
+  {activeTab === "payments" && (
+
+<div>
+
+
+<button
+onClick={() => setOpenPaymentModal(true)}
+className="mb-5 bg-green-600 text-white px-5 py-2 rounded-lg"
+>
++ إضافة دفعة
+</button>
+
+
+
+<table className="w-full border-collapse">
+
+<thead>
+
+<tr className="border-b bg-gray-100">
+
+<th className="p-3 text-right">
+التاريخ
+</th>
+
+<th className="p-3 text-right">
+المبلغ
+</th>
+
+<th className="p-3 text-right">
+ملاحظات
+</th>
+
+</tr>
+
+</thead>
+
+
+<tbody>
+
+
+{payments.length === 0 ? (
+
+<tr>
+
+<td
+colSpan={3}
+className="text-center py-8 text-gray-500"
+>
+لا توجد دفعات
+</td>
+
+</tr>
+
+):(
+
+
+payments.map((payment)=>(
+
+<tr
+key={payment.id}
+className="border-b"
+>
+
+
+<td className="p-3">
+
+{new Date(payment.payment_date)
+.toLocaleDateString("fr-CA")}
+
+</td>
+
+
+<td className="p-3 font-bold text-green-700">
+
+{Number(payment.amount).toFixed(2)}
+ دج
+
+</td>
+
+
+<td className="p-3">
+
+{payment.notes || "-"}
+
+</td>
+
+
+</tr>
+
+))
+
+)}
+
+
+</tbody>
+
+</table>
+
+
+</div>
+
+)}
 
         </div>
 
@@ -460,7 +623,106 @@ async function deleteInvoice(id: number) {
   productName={selectedProduct?.name || ""}
   history={history}
 />
+<AddPaymentModal
+open={openPaymentModal}
+warehouseId={warehouse.id}
+onClose={()=>setOpenPaymentModal(false)}
+onSuccess={async()=>{
 
+setOpenPaymentModal(false);
+
+const {id}=await params;
+
+await loadPayments(id);
+
+}}
+/>
+{openPreviousDebt && (
+
+<div className="fixed inset-0 bg-black/40 flex items-center justify-center">
+
+
+<div className="bg-white rounded-xl p-6 w-[400px]">
+
+
+<h2 className="text-xl font-bold mb-4">
+إضافة دين سابق
+</h2>
+
+
+<input
+type="number"
+value={previousDebt}
+onChange={(e)=>setPreviousDebt(e.target.value)}
+className="w-full border p-3 rounded mb-4"
+placeholder="المبلغ"
+/>
+
+
+
+<div className="flex gap-3">
+
+
+<button
+onClick={()=>setOpenPreviousDebt(false)}
+className="px-4 py-2 bg-gray-300 rounded"
+>
+إلغاء
+</button>
+
+
+
+<button
+onClick={async()=>{
+
+
+const res = await fetch(
+`/api/warehouses/${warehouse.id}/previous-balance`,
+{
+method:"PUT",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+amount:previousDebt
+})
+}
+);
+
+
+
+if(res.ok){
+
+const data = await fetch(
+`/api/warehouses/${warehouse.id}`
+);
+
+const warehouseData = await data.json();
+
+setWarehouse(warehouseData);
+
+setOpenPreviousDebt(false);
+
+}
+
+
+}}
+
+className="px-4 py-2 bg-green-600 text-white rounded"
+>
+حفظ
+</button>
+
+
+</div>
+
+
+</div>
+
+
+</div>
+
+)}
     </div>
   );
 }                  

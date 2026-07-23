@@ -1,262 +1,424 @@
-import { query } from "@/lib/db";
+"use client";
 
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-} from "@/components/ui/card";
+import { useEffect, useState } from "react";
+import CreateStoreInvoice from "@/app/Components/Stores/CreateStoreInvoice";
+import AddPreviousDebtModal 
+from "@/app/Components/Stores/AddPreviousDebtModal";
+import AddStorePaymentModal 
+from "@/app/Components/Stores/AddStorePaymentModal";
+interface Store {
+  id: number;
+  name: string;
+  phone: string;
+  address: string;
+  previous_balance: number;
+  current_balance: number;
+  notes: string;
+}
 
-import {
-  Plus,
-  ArrowRightLeft,
-} from "lucide-react";
-import { AddStoreProductDialog } from "@/app/Components/popup/add-store-product-dialog";
-import { EditStoreProductDialog } from "@/app/Components/popup/edit-store-product-dialog";
-export const dynamic = "force-dynamic";
-export default async function StorePage({
+type Tab = "products" | "invoices" | "payments" | "statement";
+interface Payment {
+  id:number;
+  amount:number;
+  payment_date:string;
+  payment_method:string;
+  notes:string;
+}
+export default function StorePage({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ search?: string }>;
-}) {            
-  const { id } = await params;
+}) {
+  const [store, setStore] = useState<Store | null>(null);
+  const [tab, setTab] = useState<Tab>("products");
+  const [invoices, setInvoices] = useState<any[]>([]);
+const [openInvoice, setOpenInvoice] = useState(false);
+
+const [selectedInvoice, setSelectedInvoice] = useState<number | null>(null);
+const [products, setProducts] = useState<any[]>([]);
+const [openDebt,setOpenDebt]=useState(false);
+const [payments,setPayments]=useState<Payment[]>([]);
+const [openPayment,setOpenPayment]=useState(false);
   
-const { search = "" } = await searchParams;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const stores = await query<any[]>(
-    `
-      SELECT *
-      FROM stores
-      WHERE id = ?
-    `,
-    [id]
-  );
+  useEffect(() => {
+    async function load() {
+      const { id } = await params;
 
-  const store = stores[0];
+      const res = await fetch(`/api/stores/${id}`);
+      const data = await res.json();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const products = await query<any[]>(
-  `
-    SELECT
-      p.id,
-      p.name,
-      ss.quantity,
-      ss.purchase_price,
-      ss.selling_price
-    FROM store_stock ss
-    INNER JOIN products p
-      ON p.id = ss.product_id
-    WHERE ss.store_id = ?
-      AND p.name LIKE ?
-    ORDER BY p.name
-  `,
-  [id, `%${search}%`]
+      setStore(data);
+      const details = await fetch(`/api/stores/${id}/details`);
+const result = await details.json();
+
+setInvoices(result.invoices);
+setProducts(result.products);
+
+const paymentsRes = await fetch(
+  `/api/stores/${id}/payments`
 );
 
-  const totalCost = products.reduce(
-    (sum, p) =>
-      sum +
-      Number(p.quantity) *
-        Number(p.purchase_price),
-    0
-  );
+const paymentsData = await paymentsRes.json();
 
-  const totalSales = products.reduce(
-    (sum, p) =>
-      sum +
-      Number(p.quantity) *
-        Number(p.selling_price),
-    0
-  );
+setPayments(paymentsData);
+    }
 
-  const totalProfit =
-    totalSales - totalCost;
+    load();
+  }, [params]);
+
+  if (!store) {
+    return (
+      <div className="p-8 text-center">
+        جاري التحميل...
+      </div>
+    );
+  }
+  const totalPayments = payments.reduce(
+  (sum,payment)=>sum + Number(payment.amount),
+  0
+);
+
+
+const currentDebt =
+  Number(store.current_balance)
+  -
+  totalPayments;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6">
 
-      <div>
-        <h1 className="text-3xl font-bold flex justify-center">
-          {store?.name}
+      <div className="bg-white rounded-xl shadow p-6 mb-6">
+
+        <h1 className="text-3xl font-bold mb-2">
+          {store.name}
         </h1>
 
-        <p className="text-muted-foreground flex justify-center">
-          إدارة مخزون المحل
-        </p>
-      </div>
+        <div className="grid grid-cols-4 gap-4 mt-6">
 
-      <div className="grid md:grid-cols-3 gap-4">
+          <div className="bg-green-50 rounded-lg p-4">
+            <div className="text-gray-500">
+              الدين الحالي
+            </div>
 
-        <Card>
-          <CardContent className="p-4">
+            <div className="text-2xl font-bold">
+              {currentDebt.toFixed(2)} دج
+            </div>
+          </div>
+
+          
+            <div className="bg-blue-50 rounded-lg p-4 relative flex justify-between gap-8">
+
+<button
+onClick={()=>setOpenDebt(true)}
+className="top-2 left-2 text-sm bg-blue-600 text-white px-2 py-1 rounded"
+>
++ إضافة  دين السابق
+</button>
             
-            <p className="text-gray-500">
-              تكلفة المخزون
-            </p>
 
-            <h2 className="text-2xl font-bold">
-              {totalCost.toLocaleString()} دج
-            </h2>
-          </CardContent>
-        </Card>
+            <div className="text-2xl font-bold">
+              {store.previous_balance} دج
+            </div>
+          </div>
 
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-gray-500">
-              قيمة البيع
-            </p>
+          <div className="bg-orange-50 rounded-lg p-4">
+            <div className="text-gray-500">
+              الهاتف
+            </div>
 
-            <h2 className="text-2xl font-bold">
-              {totalSales.toLocaleString()} دج
-            </h2>
-          </CardContent>
-        </Card>
+            <div className="font-bold">
+              {store.phone || "-"}
+            </div>
+          </div>
 
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-gray-500">
-              الربح المتوقع
-            </p>
+          <div className="bg-purple-50 rounded-lg p-4">
+            <div className="text-gray-500">
+              العنوان
+            </div>
 
-            <h2 className="text-2xl font-bold text-green-700">
-              {totalProfit.toLocaleString()} دج
-            </h2>
-          </CardContent>
-        </Card>
+            <div className="font-bold">
+              {store.address || "-"}
+            </div>
+          </div>
+
+        </div>
 
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex gap-3 mb-6">
 
-        <AddStoreProductDialog
-  storeId={Number(id)}
-/>
-
-        <Button variant="outline">
-          <ArrowRightLeft className="w-4 h-4 ml-2" />
-          تحويل من المخزن
-        </Button>
-
-      </div>
-
-      <Card>
-
-        <CardContent className="p-0 overflow-x-auto">
-         <form method="GET" className="mb-4 flex gap-2">
-  <input
-    type="text"
-    name="search"
-    defaultValue={search}
-    placeholder="ابحث عن منتج..."
-    className="flex-1 border rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-green-600"
-  />
-
-  <Button type="submit">
-    بحث
-  </Button>
-</form>
-          <table className="w-full">
-  <thead className="bg-green-700 text-white">
-    <tr>
-      <th className="p-3 text-right">
-        المنتج
-      </th>
-
-      <th className="p-3">
-        الكمية
-      </th>
-
-      <th className="p-3">
-        شراء
-      </th>
-
-      <th className="p-3">
-        بيع
-      </th>
-
-      <th className="p-3">
-        التكلفة
-      </th>
-
-      <th className="p-3">
-        قيمة البيع
-      </th>
-
-      <th className="p-3">
-        الربح
-      </th>
-
-      <th className="p-3">
-        الإجراءات
-      </th>
-    </tr>
-  </thead>
-
-  <tbody>
-    {products.map((product) => {
-      const cost =
-        Number(product.quantity) *
-        Number(product.purchase_price);
-
-      const sales =
-        Number(product.quantity) *
-        Number(product.selling_price);
-
-      const profit = sales - cost;
-
-      return (
-        <tr
-          key={product.id}
-          className="border-b"
+        <button
+          onClick={() => setTab("products")}
+          className={`px-4 py-2 rounded ${
+            tab === "products"
+              ? "bg-green-600 text-white"
+              : "bg-gray-200"
+          }`}
         >
-          <td className="p-3">
-            {product.name}
-          </td>
+          المنتجات
+        </button>
 
-          <td className="p-3 text-center">
-            {product.quantity}
-          </td>
+        <button
+          onClick={() => setTab("invoices")}
+          className={`px-4 py-2 rounded ${
+            tab === "invoices"
+              ? "bg-green-600 text-white"
+              : "bg-gray-200"
+          }`}
+        >
+          الفواتير
+        </button>
 
-          <td className="p-3 text-center">
-            {product.purchase_price}
-          </td>
+        <button
+          onClick={() => setTab("payments")}
+          className={`px-4 py-2 rounded ${
+            tab === "payments"
+              ? "bg-green-600 text-white"
+              : "bg-gray-200"
+          }`}
+        >
+          الدفعات
+        </button>
 
-          <td className="p-3 text-center">
-            {product.selling_price}
-          </td>
+        <button
+          onClick={() => setTab("statement")}
+          className={`px-4 py-2 rounded ${
+            tab === "statement"
+              ? "bg-green-600 text-white"
+              : "bg-gray-200"
+          }`}
+        >
+          كشف الحساب
+        </button>
 
-          <td className="p-3 text-center">
-            {cost.toLocaleString()}
-          </td>
+      </div>
 
-          <td className="p-3 text-center">
-            {sales.toLocaleString()}
-          </td>
+      <div className="bg-white rounded-xl shadow p-6 min-h-[400px]">
 
-          <td className="p-3 text-center font-bold text-green-700">
-            {profit.toLocaleString()}
-          </td>
+        {tab === "products" && (
+  <div>
+    <h2 className="text-xl font-bold mb-4">
+      منتجات المحل
+    </h2>
 
-          <td className="p-3 text-center">
-            <EditStoreProductDialog
-              storeId={Number(id)}
-              productId={product.id}
-              quantity={Number(product.quantity)}
-              purchasePrice={Number(product.purchase_price)}
-              sellingPrice={Number(product.selling_price)}
-            />
-          </td>
+    <table className="w-full border">
+      <thead className="bg-gray-100">
+        <tr>
+          <th className="p-2">المنتج</th>
+          <th className="p-2">الكمية</th>
+          <th className="p-2">سعر الشراء</th>
+          <th className="p-2">سعر البيع</th>
         </tr>
-      );
-    })}
-  </tbody>
+      </thead>
+
+      <tbody>
+  {products.map((item, index) => (
+    <tr key={`${item.product_id}-${index}`} className="border-t">
+      <td className="p-2">{item.product_name}</td>
+      <td className="p-2">{item.quantity}</td>
+      <td className="p-2">{item.purchase_price}</td>
+      <td className="p-2">{item.selling_price}</td>
+    </tr>
+  ))}
+</tbody>
+    </table>
+  </div>
+)}
+
+        {tab === "invoices" && (
+  <div>
+
+    <div className="flex justify-between mb-5">
+
+      <h2 className="text-xl font-bold">
+        فواتير المحل
+      </h2>
+
+      <button
+ onClick={() => {
+   setSelectedInvoice(null);
+   setOpenInvoice(true);
+ }}
+ className="bg-green-600 text-white px-4 py-2 rounded"
+>
+ + فاتورة جديدة
+</button>
+
+    </div>
+
+    <table className="w-full border">
+      <thead className="bg-gray-100">
+        <tr>
+          <th className="p-2">رقم الفاتورة</th>
+          <th className="p-2">التاريخ</th>
+          <th className="p-2">الإجمالي</th>
+          <th className="p-2">المدفوع</th>
+          <th className="p-2">المتبقي</th>
+          <th className="p-2">الحالة</th>
+          <th className="p-2">إجراء</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {invoices.map((invoice) => (
+          <tr key={invoice.id} className="border-t">
+            <td className="p-2">{invoice.invoice_number}</td>
+            <td className="p-2">{invoice.invoice_date}</td>
+            <td className="p-2">{invoice.total}</td>
+            <td className="p-2">{invoice.paid}</td>
+            <td className="p-2">{invoice.remaining}</td>
+            <td className="p-2">{invoice.status}</td>
+            <td className="p-2">
+ <button
+  onClick={() => {
+    setSelectedInvoice(invoice.id);
+    setOpenInvoice(true);
+  }}
+  className="bg-blue-600 text-white px-3 py-1 rounded"
+>
+  تعديل
+</button>
+</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+
+  </div>
+)}
+
+        {tab === "payments" && (
+
+<div>
+
+<button
+onClick={()=>setOpenPayment(true)}
+className="bg-green-600 text-white px-4 py-2 rounded mb-5"
+>
++ إضافة دفعة
+</button>
+
+
+<table className="w-full border">
+
+<thead className="bg-gray-100">
+
+<tr>
+<th className="p-2">التاريخ</th>
+<th className="p-2">المبلغ</th>
+<th className="p-2">طريقة الدفع</th>
+<th className="p-2">ملاحظات</th>
+</tr>
+
+</thead>
+
+
+<tbody>
+
+{payments.map((payment)=>(
+
+<tr key={payment.id} className="border-t">
+
+<td className="p-2">
+{payment.payment_date}
+</td>
+
+<td className="p-2 text-green-700 font-bold">
+{payment.amount} دج
+</td>
+
+<td className="p-2">
+{payment.payment_method}
+</td>
+
+<td className="p-2">
+{payment.notes || "-"}
+</td>
+
+</tr>
+
+))}
+
+</tbody>
+
 </table>
 
-        </CardContent>
 
-      </Card>
+</div>
 
+)}
+
+        {tab === "statement" && (
+          <h2 className="text-xl font-bold">
+            كشف الحساب
+          </h2>
+        )}
+
+      </div>
+         <CreateStoreInvoice
+  open={openInvoice}
+  onClose={() => {
+    setOpenInvoice(false);
+    setSelectedInvoice(null);
+  }}
+  storeId={store.id}
+  invoiceId={selectedInvoice}
+  onSuccess={() => {
+    setOpenInvoice(false);
+    setSelectedInvoice(null);
+
+    // إعادة تحميل بيانات المحل
+  }}
+/>
+<AddPreviousDebtModal
+open={openDebt}
+onClose={()=>setOpenDebt(false)}
+storeId={store.id}
+onSuccess={async()=>{
+
+ const res = await fetch(`/api/stores/${store.id}`);
+ const data = await res.json();
+
+ setStore(data);
+
+}}
+/>
+<AddStorePaymentModal
+
+open={openPayment}
+
+onClose={()=>{
+  setOpenPayment(false);
+}}
+
+storeId={store.id}
+
+onSuccess={async()=>{
+
+  setOpenPayment(false);
+
+
+  const res = await fetch(
+    `/api/stores/${store.id}/payments`
+  );
+
+  const data = await res.json();
+
+  setPayments(data);
+
+
+
+  const storeRes = await fetch(
+    `/api/stores/${store.id}`
+  );
+
+  const storeData = await storeRes.json();
+
+  setStore(storeData);
+
+}}
+
+/>
     </div>
   );
 }
