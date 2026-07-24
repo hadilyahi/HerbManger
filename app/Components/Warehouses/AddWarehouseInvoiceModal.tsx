@@ -2,7 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, X } from "lucide-react";
+import AddProductModal from "../popup/AddProductModal";
 
+interface Category {
+  id: number;
+  name: string;
+}
 interface Supplier {
   id: number;
   name: string;
@@ -59,7 +64,9 @@ export default function AddWarehouseInvoiceModal({
   const [supplierId, setSupplierId] = useState(0);
 
   const [supplierSearch, setSupplierSearch] = useState("");
-
+const [categories, setCategories] = useState<Category[]>([]);
+const [showAddProduct, setShowAddProduct] = useState(false);
+const [currentIndex, setCurrentIndex] = useState<number | null>(null);
   const [showSupplierDropdown, setShowSupplierDropdown] =
     useState(false);
 
@@ -95,11 +102,18 @@ export default function AddWarehouseInvoiceModal({
 
     async function load() {
 
-      const [productsRes, suppliersRes] =
-        await Promise.all([
-          fetch("/api/products"),
-          fetch("/api/suppliers"),
-        ]);
+      const [productsRes, suppliersRes, categoriesRes] =
+  await Promise.all([
+    fetch("/api/products"),
+    fetch("/api/suppliers"),
+    fetch("/api/categories"),
+  ]);
+
+
+const categoriesData = await categoriesRes.json();
+
+
+setCategories(categoriesData);
 
       const productsData =
         await productsRes.json();
@@ -474,89 +488,59 @@ setSearchTerms(terms);
 
                   {/* المنتج */}
 
-                  <td className="p-2 relative">
+                  <td className="p-2">
+  <div className="flex gap-2">
+    <div className="relative flex-1">
 
-                    <input
-                      value={
-  searchTerms[index] ??
-  item.productName ??
-  ""
-}
+      <input
+        value={searchTerms[index] ?? item.productName ?? ""}
+        placeholder="ابحث عن المنتج..."
+        onFocus={() => setActiveDropdown(index)}
+        onChange={(e) => {
+          setSearchTerms({
+            ...searchTerms,
+            [index]: e.target.value,
+          });
+          setActiveDropdown(index);
+        }}
+        className="w-full border rounded-xl p-3 bg-white"
+      />
 
-                      placeholder="ابحث عن المنتج..."
+      {activeDropdown === index && (
+        <div className="absolute z-40 bg-white border rounded-xl shadow-lg mt-1 w-full max-h-60 overflow-y-auto">
 
-                      onFocus={()=>
-                        setActiveDropdown(index)
-                      }
+          {products
+            .filter((p) =>
+              p.name
+                .toLowerCase()
+                .includes((searchTerms[index] || "").toLowerCase())
+            )
+            .map((product) => (
+              <div
+                key={product.id}
+                onClick={() => selectProduct(index, product)}
+                className="px-4 py-3 hover:bg-green-50 cursor-pointer"
+              >
+                {product.name}
+              </div>
+            ))}
+        </div>
+      )}
 
-                      onChange={(e)=>{
+    </div>
 
-                        setSearchTerms({
-
-                          ...searchTerms,
-
-                          [index]:
-                            e.target.value
-
-                        });
-
-                        setActiveDropdown(index);
-
-                      }}
-
-                      className="w-full border rounded-xl p-3 bg-white"
-                    />
-
-                    {activeDropdown===index && (
-
-                      <div className="absolute z-40 bg-white border rounded-xl shadow-lg mt-1 w-full max-h-60 overflow-y-auto">
-
-                        {products
-
-                          .filter((p)=>
-
-                            p.name
-                              .toLowerCase()
-                              .includes(
-
-                                (
-                                  searchTerms[index] || ""
-                                )
-                                .toLowerCase()
-
-                              )
-
-                          )
-
-                          .map((product)=>(
-
-                            <div
-
-                              key={product.id}
-
-                              onClick={()=>
-                                selectProduct(
-                                  index,
-                                  product
-                                )
-                              }
-
-                              className="px-4 py-3 hover:bg-green-50 cursor-pointer"
-
-                            >
-
-                              {product.name}
-
-                            </div>
-
-                          ))}
-
-                      </div>
-
-                    )}
-
-                  </td>
-
+    <button
+      type="button"
+      onClick={() => {
+        setCurrentIndex(index);
+        setShowAddProduct(true);
+      }}
+      className="bg-green-600 hover:bg-green-700 text-white px-3 rounded-xl"
+    >
+      <Plus size={16} />
+    </button>
+  </div>
+</td>
                   {/* السعر */}
 
                   <td className="p-2">
@@ -868,7 +852,20 @@ const res = await fetch(url, {
       </div>
 
     </div>
+    console.log(categories);
+    {showAddProduct && (
+  <AddProductModal
+    categories={categories}
+    onClose={() => setShowAddProduct(false)}
+    onSuccess={() => {
+      fetch("/api/products")
+        .then((res) => res.json())
+        .then(setProducts);
 
+      setShowAddProduct(false);
+    }}
+  />
+)}
   </div>
 
 );

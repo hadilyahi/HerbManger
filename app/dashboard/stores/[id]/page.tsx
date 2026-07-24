@@ -180,7 +180,7 @@ className="top-2 left-2 text-sm bg-blue-600 text-white px-2 py-1 rounded"
           الدفعات
         </button>
 
-        <button
+        {/* <button
           onClick={() => setTab("statement")}
           className={`px-4 py-2 rounded ${
             tab === "statement"
@@ -189,7 +189,7 @@ className="top-2 left-2 text-sm bg-blue-600 text-white px-2 py-1 rounded"
           }`}
         >
           كشف الحساب
-        </button>
+        </button> */}
 
       </div>
 
@@ -348,11 +348,11 @@ className="bg-green-600 text-white px-4 py-2 rounded mb-5"
 
 )}
 
-        {tab === "statement" && (
+        {/* {tab === "statement" && (
           <h2 className="text-xl font-bold">
             كشف الحساب
           </h2>
-        )}
+        )} */}
 
       </div>
          <CreateStoreInvoice
