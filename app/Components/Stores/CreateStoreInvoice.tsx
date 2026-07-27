@@ -363,55 +363,25 @@ item.remaining_quantity>20
 
                   <td className="p-3">
 
-                   <div className="flex items-center gap-2">
+                   <input
+  type="number"
+  step="0.001"
+  min="0"
+  max={item.remaining_quantity}
+  className="border rounded-lg px-2 py-1 w-28 text-center"
+  value={item.sellQuantity ?? 0}
+  onChange={(e) => {
+    const value = Number(e.target.value);
 
-    <button
-        className="bg-red-500 text-white w-8 h-8 rounded"
-        onClick={() => {
+    const copy = [...items];
+    copy[index].sellQuantity = Math.min(
+      Math.max(value, 0),
+      item.remaining_quantity
+    );
 
-            const copy=[...items];
-
-            copy[index].sellQuantity=Math.max(
-                0,
-                (copy[index].sellQuantity||0)-1
-            );
-
-            setItems(copy);
-
-        }}
-    >
-        -
-    </button>
-
-    <span className="w-10 text-center">
-        {item.sellQuantity||0}
-    </span>
-
-    <button
-        className="bg-green-600 text-white w-8 h-8 rounded"
-        onClick={() => {
-
-            const copy=[...items];
-
-            if(
-                (copy[index].sellQuantity||0)
-                <
-                item.remaining_quantity
-            ){
-
-                copy[index].sellQuantity=
-                (copy[index].sellQuantity||0)+1;
-
-            }
-
-            setItems(copy);
-
-        }}
-    >
-        +
-    </button>
-
-</div>
+    setItems(copy);
+  }}
+/>
 
                   </td>
 
