@@ -73,16 +73,12 @@ setPayments(paymentsData);
       </div>
     );
   }
-  const totalPayments = payments.reduce(
-  (sum,payment)=>sum + Number(payment.amount),
-  0
-);
-
-
-const currentDebt =
-  Number(store.current_balance)
-  -
-  totalPayments;
+ const currentDebt =
+  Number(store.previous_balance) +
+  invoices.reduce(
+    (sum, invoice) => sum + Number(invoice.remaining),
+    0
+  );
 
   return (
     <div className="p-6">
@@ -363,12 +359,29 @@ className="bg-green-600 text-white px-4 py-2 rounded mb-5"
   }}
   storeId={store.id}
   invoiceId={selectedInvoice}
-  onSuccess={() => {
-    setOpenInvoice(false);
-    setSelectedInvoice(null);
+  onSuccess={async () => {
+  setOpenInvoice(false);
+  setSelectedInvoice(null);
 
-    // إعادة تحميل بيانات المحل
-  }}
+  const details = await fetch(`/api/stores/${store.id}/details`);
+  const result = await details.json();
+
+  setInvoices(result.invoices);
+  setProducts(result.products);
+
+  const paymentsRes = await fetch(
+    `/api/stores/${store.id}/payments`
+  );
+
+  const paymentsData = await paymentsRes.json();
+
+  setPayments(paymentsData);
+
+  const storeRes = await fetch(`/api/stores/${store.id}`);
+  const storeData = await storeRes.json();
+
+  setStore(storeData);
+}}
 />
 <AddPreviousDebtModal
 open={openDebt}
