@@ -18,6 +18,7 @@ export async function GET(
     SELECT
       id,
       invoice_number,
+      warehouse_id,
       paid,
       remaining,
       total

@@ -487,114 +487,142 @@ export async function updateStoreInvoice(
       8- إضافة المنتجات الجديدة
     */
 
-    for (const item of data.items) {
+   /*
+  8- إضافة المنتجات الجديدة
+*/
+
+for (const item of data.items) {
+
+  // ==========================
+  // التحقق من مخزون المستودع
+  // ==========================
+
+  const [stock]: any =
+    await connection.execute(
+      `
+      SELECT quantity
+      FROM warehouse_stock
+      WHERE warehouse_id = ?
+      AND product_id = ?
+      FOR UPDATE
+      `,
+      [
+        data.warehouseId,
+        item.productId
+      ]
+    );
+
+  if (
+    !stock[0] ||
+    Number(stock[0].quantity) < Number(item.quantity)
+  ) {
+
+    throw new Error(
+      `الكمية غير كافية في مخزون المستودع للمنتج ${item.productId}`
+    );
+
+  }
 
 
+  // =========================================
+  // التحقق من الكمية المتبقية في فاتورة الشراء
+  // =========================================
 
-      // التأكد من توفر المخزون
+  const [purchaseItem]: any =
+    await connection.execute(
+      `
+      SELECT remaining_quantity
+      FROM warehouse_purchase_invoice_items
+      WHERE id = ?
+      FOR UPDATE
+      `,
+      [
+        item.warehouseInvoiceItemId
+      ]
+    );
 
-      const [stock]: any =
-      await connection.execute(
-        `
-        SELECT quantity
-        FROM warehouse_stock
-        WHERE warehouse_id = ?
-        AND product_id = ?
-        FOR UPDATE
-        `,
-        [
-          data.warehouseId,
-          item.productId
-        ]
-      );
+  if (
+    !purchaseItem[0] ||
+    Number(purchaseItem[0].remaining_quantity) < Number(item.quantity)
+  ) {
 
+    throw new Error(
+      `الكمية غير كافية في فاتورة الشراء للمنتج ${item.productId}`
+    );
 
-
-      if (
-        !stock[0] ||
-        stock[0].quantity < item.quantity
-      ) {
-
-        throw new Error(
-          `الكمية غير كافية للمنتج ${item.productId}`
-        );
-
-      }
+  }
 
 
+  // ==========================
+  // إضافة المنتج للفاتورة
+  // ==========================
+
+  await connection.execute(
+    `
+    INSERT INTO store_invoice_items
+    (
+      invoice_id,
+      warehouse_invoice_id,
+      warehouse_invoice_item_id,
+      product_id,
+      quantity,
+      purchase_price,
+      selling_price,
+      total
+    )
+    VALUES
+    (?,?,?,?,?,?,?,?)
+    `,
+    [
+      invoiceId,
+      data.warehouseInvoiceId,
+      item.warehouseInvoiceItemId,
+      item.productId,
+      item.quantity,
+      item.purchasePrice,
+      item.sellingPrice,
+      item.quantity * item.sellingPrice
+    ]
+  );
 
 
-      // إضافة المنتج للفاتورة
+  // ==========================
+  // خصم مخزون المستودع
+  // ==========================
 
-      await connection.execute(
-        `
-        INSERT INTO store_invoice_items
-        (
-          invoice_id,
-          warehouse_invoice_id,
-          warehouse_invoice_item_id,
-          product_id,
-          quantity,
-          purchase_price,
-          selling_price,
-          total
-        )
-        VALUES
-        (?,?,?,?,?,?,?,?)
-        `,
-        [
-          invoiceId,
-          data.warehouseInvoiceId,
-          item.warehouseInvoiceItemId,
-          item.productId,
-          item.quantity,
-          item.purchasePrice,
-          item.sellingPrice,
-          item.quantity * item.sellingPrice
-        ]
-      );
+  await connection.execute(
+    `
+    UPDATE warehouse_stock
+    SET quantity = quantity - ?
+    WHERE warehouse_id = ?
+    AND product_id = ?
+    `,
+    [
+      item.quantity,
+      data.warehouseId,
+      item.productId
+    ]
+  );
 
 
+  // ==================================
+  // خصم الكمية من فاتورة الشراء الأصلية
+  // ==================================
 
+  await connection.execute(
+    `
+    UPDATE warehouse_purchase_invoice_items
+    SET remaining_quantity =
+        remaining_quantity - ?
+    WHERE id = ?
+    `,
+    [
+      item.quantity,
+      item.warehouseInvoiceItemId
+    ]
+  );
 
-
-      // خصم المخزون
-
-      await connection.execute(
-        `
-        UPDATE warehouse_stock
-        SET quantity = quantity - ?
-        WHERE warehouse_id = ?
-        AND product_id = ?
-        `,
-        [
-          item.quantity,
-          data.warehouseId,
-          item.productId
-        ]
-      );
-
-
-
-
-
-      // تحديث الكمية المتبقية من فاتورة الشراء
-
-      await connection.execute(
-        `
-        UPDATE warehouse_purchase_invoice_items
-        SET remaining_quantity =
-            remaining_quantity - ?
-        WHERE id = ?
-        `,
-        [
-          item.quantity,
-          item.warehouseInvoiceItemId
-        ]
-      );
-
-
-    }
+}
 
 
 

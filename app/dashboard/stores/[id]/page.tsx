@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import CreateStoreInvoice from "@/app/Components/Stores/CreateStoreInvoice";
+import EditStoreInvoice from "@/app/Components/Stores/EditStoreInvoice";
 import AddPreviousDebtModal 
 from "@/app/Components/Stores/AddPreviousDebtModal";
 import AddStorePaymentModal 
 from "@/app/Components/Stores/AddStorePaymentModal";
+
 interface Store {
   id: number;
   name: string;
@@ -32,9 +34,11 @@ export default function StorePage({
   const [store, setStore] = useState<Store | null>(null);
   const [tab, setTab] = useState<Tab>("products");
   const [invoices, setInvoices] = useState<any[]>([]);
-const [openInvoice, setOpenInvoice] = useState(false);
-
+const [openCreateInvoice, setOpenCreateInvoice] = useState(false);
+const [openEditInvoice, setOpenEditInvoice] = useState(false);
 const [selectedInvoice, setSelectedInvoice] = useState<number | null>(null);
+
+
 const [products, setProducts] = useState<any[]>([]);
 const [openDebt,setOpenDebt]=useState(false);
 const [payments,setPayments]=useState<Payment[]>([]);
@@ -65,7 +69,21 @@ setPayments(paymentsData);
 
     load();
   }, [params]);
+async function refreshStoreData() {
+  const details = await fetch(`/api/stores/${store!.id}/details`);
+  const result = await details.json();
 
+  setInvoices(result.invoices);
+  setProducts(result.products);
+
+  const paymentsRes = await fetch(`/api/stores/${store!.id}/payments`);
+  const paymentsData = await paymentsRes.json();
+  setPayments(paymentsData);
+
+  const storeRes = await fetch(`/api/stores/${store!.id}`);
+  const storeData = await storeRes.json();
+  setStore(storeData);
+}
   if (!store) {
     return (
       <div className="p-8 text-center">
@@ -231,13 +249,10 @@ className="top-2 left-2 text-sm bg-blue-600 text-white px-2 py-1 rounded"
       </h2>
 
       <button
- onClick={() => {
-   setSelectedInvoice(null);
-   setOpenInvoice(true);
- }}
- className="bg-green-600 text-white px-4 py-2 rounded"
+  onClick={() => setOpenCreateInvoice(true)}
+  className="bg-green-600 text-white px-4 py-2 rounded"
 >
- + فاتورة جديدة
+  + فاتورة جديدة
 </button>
 
     </div>
@@ -268,7 +283,7 @@ className="top-2 left-2 text-sm bg-blue-600 text-white px-2 py-1 rounded"
  <button
   onClick={() => {
     setSelectedInvoice(invoice.id);
-    setOpenInvoice(true);
+    setOpenEditInvoice(true);
   }}
   className="bg-blue-600 text-white px-3 py-1 rounded"
 >
@@ -351,37 +366,29 @@ className="bg-green-600 text-white px-4 py-2 rounded mb-5"
         )} */}
 
       </div>
-         <CreateStoreInvoice
-  open={openInvoice}
+        <CreateStoreInvoice
+  open={openCreateInvoice}
+  onClose={() => setOpenCreateInvoice(false)}
+  storeId={store.id}
+  onSuccess={async () => {
+    setOpenCreateInvoice(false);
+    await refreshStoreData();
+  }}
+/>
+
+<EditStoreInvoice
+  open={openEditInvoice}
   onClose={() => {
-    setOpenInvoice(false);
+    setOpenEditInvoice(false);
     setSelectedInvoice(null);
   }}
   storeId={store.id}
-  invoiceId={selectedInvoice}
+  invoiceId={selectedInvoice as number}
   onSuccess={async () => {
-  setOpenInvoice(false);
-  setSelectedInvoice(null);
-
-  const details = await fetch(`/api/stores/${store.id}/details`);
-  const result = await details.json();
-
-  setInvoices(result.invoices);
-  setProducts(result.products);
-
-  const paymentsRes = await fetch(
-    `/api/stores/${store.id}/payments`
-  );
-
-  const paymentsData = await paymentsRes.json();
-
-  setPayments(paymentsData);
-
-  const storeRes = await fetch(`/api/stores/${store.id}`);
-  const storeData = await storeRes.json();
-
-  setStore(storeData);
-}}
+    setOpenEditInvoice(false);
+    setSelectedInvoice(null);
+    await refreshStoreData();
+  }}
 />
 <AddPreviousDebtModal
 open={openDebt}
