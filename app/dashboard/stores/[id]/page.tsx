@@ -110,7 +110,7 @@ async function refreshStoreData() {
         <div className="grid grid-cols-4 gap-4 mt-6">
 
           <div className="bg-green-50 rounded-lg p-4">
-            <div className="text-gray-500">
+            <div className="text-gray-500 text-xl font-bold flex justify-center">
               الدين الحالي
             </div>
 
@@ -120,8 +120,11 @@ async function refreshStoreData() {
           </div>
 
           
-            <div className="bg-blue-50 rounded-lg p-4 relative flex justify-between gap-8">
-
+            <div className="bg-blue-50 rounded-lg p-4 relative  gap-8">
+ <div className="text-gray-500 font-bold text-xl flex justify-center">
+             الدين السابق
+            </div>
+         <div className="flex justify-between"> 
 <button
 onClick={()=>setOpenDebt(true)}
 className="top-2 left-2 text-sm bg-blue-600 text-white px-2 py-1 rounded"
@@ -133,6 +136,7 @@ className="top-2 left-2 text-sm bg-blue-600 text-white px-2 py-1 rounded"
             <div className="text-2xl font-bold">
               {store.previous_balance} دج
             </div>
+            </div>  
           </div>
 
           <div className="bg-orange-50 rounded-lg p-4">

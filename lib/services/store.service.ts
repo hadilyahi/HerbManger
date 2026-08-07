@@ -78,21 +78,37 @@ export async function getStoreInvoices(storeId: number) {
   return query(
     `
     SELECT
-      id,
-      invoice_number,
-      invoice_date,
-      total,
-      paid,
-      remaining,
-      status
-    FROM store_invoices
-    WHERE store_id = ?
-    ORDER BY id DESC
+      si.id,
+      si.invoice_number,
+      DATE_FORMAT(MIN(wpi.invoice_date), '%Y-%m-%d') AS invoice_date,
+      si.total,
+      si.paid,
+      si.remaining,
+      si.status
+
+    FROM store_invoices si
+
+    LEFT JOIN store_invoice_items sii
+      ON sii.invoice_id = si.id
+
+    LEFT JOIN warehouse_purchase_invoices wpi
+      ON wpi.id = sii.warehouse_invoice_id
+
+    WHERE si.store_id = ?
+
+    GROUP BY
+      si.id,
+      si.invoice_number,
+      si.total,
+      si.paid,
+      si.remaining,
+      si.status
+
+    ORDER BY si.id DESC
     `,
     [storeId]
   );
 }
-
 export async function getStoreProducts(storeId: number) {
   return query(
     `
