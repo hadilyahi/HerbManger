@@ -59,7 +59,7 @@ const [selectedProduct, setSelectedProduct] =
 
 const [openHistory, setOpenHistory] = useState(false);
   const [activeTab, setActiveTab] = useState("products");
-
+const [productSearch, setProductSearch] = useState("");
   // يجب أن يكون هنا وليس داخل useEffect
   const [openInvoiceModal, setOpenInvoiceModal] = useState(false);
   const [editingInvoiceId, setEditingInvoiceId] = useState<number | null>(null);
@@ -176,6 +176,9 @@ async function deleteInvoice(id: number) {
   await loadProducts(warehouseId);
 
 }
+const filteredProducts = products.filter((product) =>
+  product.name.toLowerCase().includes(productSearch.toLowerCase())
+);
   return (
     <div className="p-6 space-y-6">
 
@@ -339,50 +342,77 @@ className="mt-3 text-4xl font-bold text-green-700"
         <div className="p-6">
 
 {activeTab === "products" && (
-  
+  <>
+    {/* البحث - خارج الجدول */}
+    <div className="mb-5 flex items-center justify-between gap-4">
 
+      <div className="relative w-full max-w-md">
+        <input
+          type="text"
+          value={productSearch}
+          onChange={(e) => setProductSearch(e.target.value)}
+          placeholder="🔍 ابحث عن منتج..."
+          className="w-full border border-gray-300 rounded-xl px-4 py-3
+                     focus:outline-none focus:ring-2 focus:ring-green-500
+                     focus:border-green-500"
+        />
+      </div>
+
+      <div className="text-sm text-gray-500">
+        {filteredProducts.length} منتج
+      </div>
+
+    </div>
+
+    {/* الجدول */}
     <table className="w-full border-collapse">
 
-      <thead className="border-b bg-gray-100 ">
-  <tr>
-    <th className="px-5 py-4 text-right font-semibold">
-      المنتج
-    </th>
+      <thead className="border-b bg-gray-100">
+        <tr>
+          <th className="px-5 py-4 text-right font-semibold">
+            المنتج
+          </th>
 
-    <th className="px-5 py-4 text-center font-semibold">
-      الكمية
-    </th>
+          <th className="px-5 py-4 text-center font-semibold">
+            الكمية
+          </th>
 
-    <th className="px-5 py-4 text-center font-semibold">
-      آخر سعر شراء
-    </th>
+          <th className="px-5 py-4 text-center font-semibold">
+            آخر سعر شراء
+          </th>
 
-    <th className="px-5 py-4 text-center font-semibold">
-      قيمة المخزون
-    </th>
+          <th className="px-5 py-4 text-center font-semibold">
+            قيمة المخزون
+          </th>
 
-    <th className="px-5 py-4 text-center font-semibold">
-      الإجراءات
-    </th>
-  </tr>
-</thead>
+          <th className="px-5 py-4 text-center font-semibold">
+            الإجراءات
+          </th>
+        </tr>
+      </thead>
 
       <tbody>
-        {products.length === 0 ? (
+        {filteredProducts.length === 0 ? (
+
           <tr>
             <td
-              colSpan={4}
+              colSpan={5}
               className="py-10 text-center text-gray-500"
             >
-              لا توجد منتجات داخل هذا المخزن
+              {productSearch
+                ? "لا توجد منتجات مطابقة للبحث"
+                : "لا توجد منتجات داخل هذا المخزن"}
             </td>
           </tr>
+
         ) : (
-          products.map((product) => (
+
+          filteredProducts.map((product) => (
             <tr
               key={product.id}
               className="border-t hover:bg-gray-50 transition"
             >
+
               <td className="px-5 py-4 font-medium">
                 {product.name}
               </td>
@@ -401,26 +431,28 @@ className="mt-3 text-4xl font-bold text-green-700"
                   Number(product.last_purchase_price)
                 ).toFixed(2)} دج
               </td>
+
               <td className="px-5 py-4 text-center">
-  <button
-    onClick={async () => {
-      setSelectedProduct(product);
-      await loadHistory(product.id);
-      setOpenHistory(true);
-    }}
-    className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
-  >
-    تفاصيل
-  </button>
-</td>
+                <button
+                  onClick={async () => {
+                    setSelectedProduct(product);
+                    await loadHistory(product.id);
+                    setOpenHistory(true);
+                  }}
+                  className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+                >
+                  تفاصيل
+                </button>
+              </td>
+
             </tr>
           ))
+
         )}
       </tbody>
 
     </table>
-
-  
+  </>
 )}
 
 
