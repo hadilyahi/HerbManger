@@ -239,6 +239,19 @@ export default function WarehousePage({
       .toLowerCase()
       .includes(productSearch.toLowerCase())
   );
+  const suppliers = Array.from(
+  new Set(
+    invoices
+      .map((invoice) => invoice.supplier)
+      .filter(Boolean)
+  )
+);
+
+const filteredInvoices = invoices.filter((invoice) => {
+  if (!supplierFilter) return true;
+
+  return invoice.supplier === supplierFilter;
+});
   const formatMoney = (value: number | string) => {
   return Number(value || 0).toFixed(2);
 };
@@ -727,32 +740,55 @@ export default function WarehousePage({
             {activeTab === "invoices" && (
               <div>
 
-                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
 
-                  <div>
+  <div>
+    <h2 className="text-lg font-bold text-slate-900">
+      فواتير الشراء
+    </h2>
 
-                    <h2 className="text-lg font-bold text-slate-900">
-                      فواتير الشراء
-                    </h2>
+    <p className="mt-1 text-xs text-slate-500">
+      إدارة جميع فواتير شراء المخزن
+    </p>
+  </div>
 
-                    <p className="mt-1 text-xs text-slate-500">
-                      إدارة جميع فواتير شراء المخزن
-                    </p>
+  <div className="flex flex-col gap-3 sm:flex-row">
 
-                  </div>
+    {/* فلتر المورد */}
+    <select
+      value={supplierFilter}
+      onChange={(e) => setSupplierFilter(e.target.value)}
+      className="min-w-[220px] rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-700 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
+    >
+      <option value="">
+        جميع الموردين
+      </option>
 
-                  <button
-                    onClick={() => {
-                      setEditingInvoiceId(null);
-                      setOpenInvoiceModal(true);
-                    }}
-                    className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700"
-                  >
-                    <Plus size={17} />
-                    فاتورة جديدة
-                  </button>
+      {suppliers.map((supplier) => (
+        <option
+          key={supplier}
+          value={supplier}
+        >
+          {supplier}
+        </option>
+      ))}
+    </select>
 
-                </div>
+    {/* فاتورة جديدة */}
+    <button
+      onClick={() => {
+        setEditingInvoiceId(null);
+        setOpenInvoiceModal(true);
+      }}
+      className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700"
+    >
+      <Plus size={17} />
+      فاتورة جديدة
+    </button>
+
+  </div>
+
+</div>
 
                 <div className="overflow-x-auto rounded-xl border border-slate-200">
 
@@ -800,7 +836,7 @@ export default function WarehousePage({
 
                     <tbody>
 
-                      {invoices.length === 0 ? (
+                      {filteredInvoices.length === 0 ? (
 
                         <tr>
 
@@ -816,8 +852,10 @@ export default function WarehousePage({
                               </div>
 
                               <p className="text-sm font-semibold text-slate-600">
-                                لا توجد فواتير شراء
-                              </p>
+  {supplierFilter
+    ? "لا توجد فواتير لهذا المورد"
+    : "لا توجد فواتير شراء"}
+</p>
 
                             </div>
 
@@ -827,7 +865,7 @@ export default function WarehousePage({
 
                       ) : (
 
-                        invoices.map((invoice) => (
+                        filteredInvoices.map((invoice) => (
 
                           <tr
                             key={invoice.id}

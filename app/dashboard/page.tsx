@@ -85,10 +85,10 @@ export default function DashboardPage() {
                 <div className="relative overflow-hidden rounded-3xl border border-white/20 bg-white/10 p-3 shadow-2xl backdrop-blur">
 
                   <Image
-                    src="/assets/photo1.png"
+                    src="/assets/Logoacheb.png"
                     alt="تاج السلطان"
-                    width={784}
-                    height={340}
+                    width={600}
+                    height={200}
                     priority
                     className="h-auto w-full max-w-[600px] rounded-2xl object-cover"
                   />
